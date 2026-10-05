@@ -142,6 +142,37 @@ menu "Muse"
             Without it those characters show as boxes. Hangul isn't
             included.
 
+    config MUSE_TTS_AZURE
+        bool "Speak replies with Azure AI Speech"
+        depends on (MUSE_ENABLED || HOMEHUB_VOICE) && SPIRAM
+        default n
+        help
+            Muse replies in text. With this on, each reply message goes to
+            Azure AI Speech and the MP3 it returns plays on the speaker,
+            the captions following it. If the request fails, the reply is
+            shown at reading pace as without it. Needs a Speech resource's
+            key and region (portal.azure.com). The key ships inside the
+            firmware, like the SDK token: keep it out of git and revoke it
+            if it leaks.
+
+    config MUSE_TTS_AZURE_KEY
+        string "Azure Speech key"
+        depends on MUSE_TTS_AZURE
+        default ""
+
+    config MUSE_TTS_AZURE_REGION
+        string "Azure Speech region"
+        depends on MUSE_TTS_AZURE
+        default "southeastasia"
+
+    config MUSE_TTS_AZURE_VOICE
+        string "Azure voice"
+        depends on MUSE_TTS_AZURE
+        default "vi-VN-HoaiMyNeural"
+        help
+            Any Azure neural voice, such as vi-VN-NamMinhNeural or
+            en-US-AvaNeural. Its name starts with its language.
+
     config MUSE_JC3248W535_MIC_GPIO
         int "JC3248W535: GPIO for an external I2S mic's data (SD) line"
         depends on MUSE_BOARD_GUITION_JC3248W535
