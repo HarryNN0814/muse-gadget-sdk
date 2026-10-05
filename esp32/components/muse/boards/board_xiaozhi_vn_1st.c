@@ -76,7 +76,8 @@ static const char *TAG = "board";
 #define PA_EN GPIO_NUM_4       /* amp on while HIGH */
 
 #define TALK_GPIO GPIO_NUM_0   /* BOOT */
-#define MENU_GPIO GPIO_NUM_39  /* Vol+ */
+#define MENU_GPIO GPIO_NUM_39  /* Vol+: opens the menu, then moves down */
+#define UP_GPIO GPIO_NUM_40    /* Vol-: moves up, or back from a page */
 #define CHARGING_GPIO GPIO_NUM_47   /* LOW while charging */
 #define BATT_ADC ADC_CHANNEL_6      /* ADC2: GPIO17 */
 
@@ -119,7 +120,7 @@ static const nv3023_lcd_init_cmd_t s_lcd_init[] = {
 static i2c_master_bus_handle_t s_i2c;
 static esp_lcd_panel_io_handle_t s_io;
 static esp_lcd_panel_handle_t s_panel;
-static muse_gpio_button_t s_talk, s_menu;
+static muse_gpio_button_t s_talk, s_menu, s_up;
 static adc_oneshot_unit_handle_t s_adc;
 
 static esp_err_t init(void)
@@ -135,6 +136,7 @@ static esp_err_t init(void)
     ESP_RETURN_ON_ERROR(i2c_new_master_bus(&i2c_cfg, &s_i2c), TAG, "i2c");
     ESP_RETURN_ON_ERROR(muse_gpio_button_init(&s_talk, TALK_GPIO), TAG, "talk button");
     ESP_RETURN_ON_ERROR(muse_gpio_button_init(&s_menu, MENU_GPIO), TAG, "menu button");
+    ESP_RETURN_ON_ERROR(muse_gpio_button_init(&s_up, UP_GPIO), TAG, "up button");
 
     const gpio_config_t charging = {
         .pin_bit_mask = 1ULL << CHARGING_GPIO,
@@ -310,7 +312,11 @@ static esp_err_t audio_init(esp_codec_dev_handle_t *spk, esp_codec_dev_handle_t 
 
 static unsigned poll_buttons(void)
 {
-    return muse_gpio_button_poll(&s_talk) | muse_gpio_button_poll(&s_menu) << 2;
+    unsigned ev = muse_gpio_button_poll(&s_talk) | muse_gpio_button_poll(&s_menu) << 2;
+    if (muse_gpio_button_poll(&s_up) & MUSE_BTN_TALK_PRESS) {
+        ev |= MUSE_BTN_UP;
+    }
+    return ev;
 }
 
 /* Raw 12-bit counts at 12 dB to percent, the xiaozhi port's table. The divider
@@ -365,7 +371,10 @@ static const muse_board_t s_board = {
     .diagonal_in = 1.83f,
     .talk_button = "boot",
     .aux_button = "Vol+",
-    .talk_hint = { LV_ALIGN_TOP_LEFT, 8, 8 },
+    /* The menu puts each button's hint on the bottom bar by these: Select on
+     * the left, Down on the right. */
+    .talk_hint = { LV_ALIGN_BOTTOM_LEFT, 8, -8 },
+    .aux_hint = { LV_ALIGN_BOTTOM_RIGHT, -8, -8 },
     .frame_ms = 40,
     .init = init,
     .display_start = display_start,

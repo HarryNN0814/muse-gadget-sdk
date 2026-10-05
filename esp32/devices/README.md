@@ -69,7 +69,7 @@ session to Muse. The rest depends on the hardware.
 | Touch | — | — | — | — | — | — | — | — | — | ✅ | ✅ | — | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — |
 | Battery status | — | — | — | — | — | — | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Voltage only | — | — | ✅ | ✅ | ✅ | Voltage only | — | — | Percent only |
 | Over-the-air updates | Off | Off | Off | Off | Off | Off | Off | Off | Off | On | On | On | On | On | On | On | Off | On | On | On | On | On | Off | On | On |
-| Buttons | BOOT | BOOT | BOOT | BOOT | Top | Green | Green | Centre (talk), dial | XIAO BOOT (talk/setup) | PWR (talk), BOOT | BOOT (talk), PWR | Two | BOOT (talk), PWR | Wheel (press to talk, turn to sleep) | Front (talk), side (menu), PWR | Front (talk), side (menu), PWR | GO/Space (talk), Esc/Enter/arrows (menu) | BOOT/CONFIG (talk) | Yellow (talk), blue (sleep), PWR | PWR (talk), RST | Touch BtnB (talk), PWR | BOOT (talk) | BOOT | BOOT (talk) | BOOT (talk), Vol+ (menu) |
+| Buttons | BOOT | BOOT | BOOT | BOOT | Top | Green | Green | Centre (talk), dial | XIAO BOOT (talk/setup) | PWR (talk), BOOT | BOOT (talk), PWR | Two | BOOT (talk), PWR | Wheel (press to talk, turn to sleep) | Front (talk), side (menu), PWR | Front (talk), side (menu), PWR | GO/Space (talk), Esc/Enter/arrows (menu) | BOOT/CONFIG (talk) | Yellow (talk), blue (sleep), PWR | PWR (talk), RST | Touch BtnB (talk), PWR | BOOT (talk) | BOOT | BOOT (talk) | BOOT (talk), Vol+/Vol- (menu) |
 
 Boards without PSRAM (the ideaspark, the C6 boards and the Cardputer ADV) don't have room for
 the home-network tunnel. Muse can still reach and control them once the
@@ -410,7 +410,8 @@ A Vietnamese xiaozhi board: an ESP32-S3R8 with the Xingzhi Cube's 1.83"
 Pins, the panel's init sequence and the battery levels follow its xiaozhi port
 in [TienHuyIoT/xiaozhi-esp32_vietnam](https://github.com/TienHuyIoT/xiaozhi-esp32_vietnam)
 (`main/boards/xiaozhi-ai-iot-vietnam-1st/`). BOOT is push-to-talk, Vol+
-opens the menu and moves down it, and BOOT selects; Vol- isn't used. There's no touch, so set
+opens the menu and moves down it, Vol- moves up it (or back to the list from a
+page), and BOOT selects. There's no touch, so set
 it up over BLE. The battery shows as a percentage from the port's table, and
 the charge pin (GPIO47) says when it's charging.
 
