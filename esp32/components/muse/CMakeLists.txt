@@ -92,6 +92,8 @@ if(CONFIG_MUSE_ENABLED)
         list(APPEND srcs "boards/board_fnk0104b.c")
     elseif(CONFIG_MUSE_BOARD_GUITION_JC3248W535)
         list(APPEND srcs "boards/board_guition_jc3248w535.c")
+    elseif(CONFIG_MUSE_BOARD_XIAOZHI_VN_1ST)
+        list(APPEND srcs "boards/board_xiaozhi_vn_1st.c")
     endif()
 elseif(CONFIG_HOMEHUB_VOICE)
     # The Voice PE board uses just the Hatch voice session; the project's main/
