@@ -146,6 +146,18 @@ menu "Muse"
             Without it those characters show as boxes. Hangul isn't
             included.
 
+    config MUSE_LATIN_FONT
+        bool "Show Vietnamese and other accented letters in captions"
+        depends on MUSE_ENABLED
+        default n
+        help
+            Without it, captions show accented Latin letters as their plain
+            ones. With it, a caption with any in it (Latin-1, Latin
+            Extended-A, the horned O and U, and Vietnamese's U+1EA0-1EF9)
+            shows in GNU Unifont's 8x16 bitmaps, the whole caption in that
+            one font. Small screens show such a caption one 16 px line at a
+            time. Takes about 10 KB of flash and no RAM.
+
     config MUSE_TTS_AZURE
         bool "Speak replies with Azure AI Speech"
         depends on (MUSE_ENABLED || HOMEHUB_VOICE) && SPIRAM
