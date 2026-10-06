@@ -162,9 +162,11 @@ menu "Muse"
         help
             Muse guesses a voice note's language, and can take one it knows
             less well for another it knows better (Vietnamese for Thai, say).
-            With this on, the note goes to Azure AI Speech in the language
-            set below, and its transcript goes to Muse as the message. Uses
-            the same Speech key and region as the replies' speech.
+            With this on, the note streams to Azure AI Speech while it's
+            recorded, in the language set below, and its transcript goes to
+            Muse as the message. A press under a second, or one Azure hears
+            no speech in, sends nothing. Uses the same Speech key and region
+            as the replies' speech.
 
     config MUSE_STT_AZURE_LANGUAGE
         string "Voice note language"
