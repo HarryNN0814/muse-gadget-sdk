@@ -451,22 +451,48 @@ static const lv_font_t *font_pick(const lv_font_t *full, const lv_font_t *compac
 #if CONFIG_MUSE_CJK_FONT
 LV_FONT_DECLARE(muse_font_cjk_16)
 #endif
+#if CONFIG_MUSE_LATIN_FONT
+LV_FONT_DECLARE(muse_font_latin_16)
+#endif
 
 /* unscii-16 for captions and replies; with CONFIG_MUSE_CJK_FONT, a copy that
  * falls back to Unifont's 16x16 CJK, the same cell, for what unscii lacks. */
 static const lv_font_t *caption_font(void)
 {
 #if CONFIG_MUSE_CJK_FONT
-    static lv_font_t font;
+    static lv_font_t font, cjk;
     if (!font.get_glyph_dsc) {
+        cjk = muse_font_cjk_16;
+#if CONFIG_MUSE_LATIN_FONT
+        cjk.fallback = &muse_font_latin_16;   /* accented letters among CJK */
+#endif
         font = lv_font_unscii_16;
-        font.fallback = &muse_font_cjk_16;
+        font.fallback = &cjk;
     }
     return &font;
 #else
     return &lv_font_unscii_16;
 #endif
 }
+
+#if CONFIG_MUSE_CJK_FONT || CONFIG_MUSE_LATIN_FONT
+/* A caption's font: unscii-8 on a small screen's band, caption_font()
+ * elsewhere, unless the caption needs a font of its own. */
+static const lv_font_t *caption_font_for(const char *text, bool band)
+{
+#if CONFIG_MUSE_CJK_FONT
+    if (muse_text_has_cjk(text)) {
+        return caption_font();   /* CJK doesn't fit unscii-8's cell */
+    }
+#endif
+#if CONFIG_MUSE_LATIN_FONT
+    if (muse_text_has_latin(text)) {
+        return &muse_font_latin_16;   /* Unifont's 8x16, the whole caption in it */
+    }
+#endif
+    return band ? &lv_font_unscii_8 : caption_font();
+}
+#endif
 
 static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font, uint32_t color)
 {
@@ -890,6 +916,9 @@ static void build_screen(void)
      * these rows, so there's nowhere to put this without covering the face. */
     lv_obj_set_flag(s_name_lbl, LV_OBJ_FLAG_HIDDEN, s_small && !s_tall && s_h < 200);
 
+#if CONFIG_MUSE_LATIN_FONT
+    muse_text_keep_latin();
+#endif
     s_caption_lbl = make_label(face, font_pick(caption_font(), &lv_font_unscii_8), COLOR_CAPTION);
     if (s_small) {
         /* Two lines over the bottom of the face, on a dark band so they stay
@@ -906,6 +935,13 @@ static void build_screen(void)
         /* CJK doesn't fit unscii-8's cell, so a reply with CJK in it fills the
          * band one line at a time in the 16 px caption font instead. */
         muse_state_set_cjk_page(s_w / lv_font_get_glyph_width(caption_font(), 'M', ' '), 1);
+#endif
+#if CONFIG_MUSE_LATIN_FONT
+        /* Nor do accented letters: one line of Unifont's 8x16. Bigger screens
+         * page them as their other replies, Unifont being the narrower.
+         * ponytail: so those pages fill half their width; a page of their own
+         * there needs MUSE_CAPTION_MAX to allow for 3-byte letters. */
+        muse_state_set_latin_page(s_w / lv_font_get_glyph_width(&muse_font_latin_16, 'M', ' '), 1);
 #endif
 
         s_bar = lv_obj_create(face);
@@ -1409,10 +1445,8 @@ static void update_status(muse_mode_t mode, float now)
     }
     if (fresh) {
         lv_obj_t *lbl = answer >= 0 ? s_reply_lbl : s_caption_lbl;
-#if CONFIG_MUSE_CJK_FONT
-        if (s_small) {
-            lv_obj_set_style_text_font(s_caption_lbl, muse_text_has_cjk(caption) ? caption_font() : &lv_font_unscii_8, 0);
-        }
+#if CONFIG_MUSE_CJK_FONT || CONFIG_MUSE_LATIN_FONT
+        lv_obj_set_style_text_font(lbl, caption_font_for(caption, lbl == s_caption_lbl && s_small), 0);
 #endif
         lv_label_set_text(lbl, caption);
         lv_obj_set_flag(lbl, LV_OBJ_FLAG_HIDDEN, !caption[0]);

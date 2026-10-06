@@ -16,7 +16,10 @@
 # Regenerates components/muse/fonts/muse_font_cjk_16.c, the CJK fallback for
 # the caption font (CONFIG_MUSE_CJK_FONT): GNU Unifont's 16x16 bitmaps, the
 # same cell as unscii-16, for CJK punctuation, kana, every CJK Unified
-# Ideograph and the fullwidth forms. Needs curl and npx (Node.js).
+# Ideograph and the fullwidth forms. And muse_font_latin_16.c, the caption
+# font for accented letters (CONFIG_MUSE_LATIN_FONT): Unifont's 8x16 for
+# ASCII and the Latin letters with accents, Vietnamese's among them.
+# Needs curl and npx (Node.js).
 set -eu
 
 VERSION=16.0.04
@@ -34,4 +37,12 @@ npx -y lv_font_conv@1.5.3 --font "$TMP/unifont.otf" --size 16 --bpp 1 \
     -r 0x3000-0x30FF -r 0x4E00-0x9FFF -r 0xFF00-0xFFEF -o "$TMP/font.c"
 # The project includes LVGL as "lvgl.h"; the header names no temp paths.
 sed -e 's|#include "lvgl/lvgl.h"|#include "lvgl.h"|' -e "s|$TMP/||g" "$TMP/font.c" > "$OUT"
+echo "wrote $OUT"
+
+# The letters muse_text.c's latin_letter() keeps in a caption.
+OUT="$HERE/components/muse/fonts/muse_font_latin_16.c"
+(cd "$TMP" && npx -y lv_font_conv@1.5.3 --font unifont.otf --size 16 --bpp 1 \
+    --format lvgl --lv-font-name muse_font_latin_16 --no-compress \
+    -r 0x20-0x7E -r 0xC0-0x17F -r 0x1A0-0x1B0 -r 0x1EA0-0x1EF9 -o font.c)
+sed -e 's|#include "lvgl/lvgl.h"|#include "lvgl.h"|' "$TMP/font.c" > "$OUT"
 echo "wrote $OUT"
