@@ -101,7 +101,8 @@ static const char *TAG = "muse_chat_session";
 #define IN_BYTES (MIC_RATE * 2 * 8)        /* 8 s of mic backlog while connecting */
 #define OUT_BYTES (MIC_RATE * 2 * 2)       /* 2 s of decoded reply */
 #define EV_TEXT 72
-#define TEXT_MAX 1024                      /* a message's text, for captions timed to its speech */
+#define TEXT_MAX 4096                      /* a message's text, for captions timed to its speech; Vietnamese
+                                              takes 2-3 bytes a letter, and a long reply 2 KB */
 #define SPEECH_CHARS_PER_S 14              /* until the speech's length is known */
 #define TEXT_CHARS_PER_S 16                /* speaker off: reading pace, a little over speech */
 #define TEXT_HOLD_S 2                      /* speaker off: how long a message's last lines stay up */
@@ -1502,7 +1503,18 @@ static void append_text(msg_t &m, const char *text)
         if (!m.len) {
             full[0] = '\0';
         }
-        strlcat(full, text, TEXT_MAX);
+        if (strlcat(full, text, TEXT_MAX) >= TEXT_MAX) {
+            /* Cut short: not mid-character, which the speech's SSML can't have. */
+            size_t end = TEXT_MAX - 1, start = end;
+            while (start && (full[start - 1] & 0xC0) == 0x80) {
+                start--;
+            }
+            unsigned char lead = start ? (unsigned char)full[start - 1] : 0;
+            size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+            if (start && end - (start - 1) < need) {
+                full[start - 1] = '\0';
+            }
+        }
     }
     m.len += add;
     size_t have = strlen(m.tail);
