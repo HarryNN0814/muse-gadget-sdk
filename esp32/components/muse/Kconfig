@@ -155,14 +155,33 @@ menu "Muse"
             firmware, like the SDK token: keep it out of git and revoke it
             if it leaks.
 
+    config MUSE_STT_AZURE
+        bool "Transcribe voice notes with Azure AI Speech"
+        depends on MUSE_HATCH
+        default n
+        help
+            Muse guesses a voice note's language, and can take one it knows
+            less well for another it knows better (Vietnamese for Thai, say).
+            With this on, the note goes to Azure AI Speech in the language
+            set below, and its transcript goes to Muse as the message. Uses
+            the same Speech key and region as the replies' speech.
+
+    config MUSE_STT_AZURE_LANGUAGE
+        string "Voice note language"
+        depends on MUSE_STT_AZURE
+        default "vi-VN"
+        help
+            An Azure speech-to-text locale, such as vi-VN or en-US.
+
+    # Shared by both directions; the names predate speech-to-text.
     config MUSE_TTS_AZURE_KEY
         string "Azure Speech key"
-        depends on MUSE_TTS_AZURE
+        depends on MUSE_TTS_AZURE || MUSE_STT_AZURE
         default ""
 
     config MUSE_TTS_AZURE_REGION
         string "Azure Speech region"
-        depends on MUSE_TTS_AZURE
+        depends on MUSE_TTS_AZURE || MUSE_STT_AZURE
         default "southeastasia"
 
     config MUSE_TTS_AZURE_VOICE

@@ -51,7 +51,7 @@
 
 #include "esp_attr.h"
 #include "esp_crt_bundle.h"
-#if CONFIG_MUSE_TTS_AZURE
+#if CONFIG_MUSE_TTS_AZURE || CONFIG_MUSE_STT_AZURE
 #include "esp_http_client.h"
 #endif
 #include "esp_heap_caps.h"
@@ -264,6 +264,14 @@ static char s_reply_shown[EV_TEXT];   /* the pre-speech caption last sent */
 
 static void mark(mark_t m);
 static bool open_note(void);
+#if CONFIG_MUSE_STT_AZURE
+static uint8_t *s_stt_wav;   /* the whole note as a WAV, for Azure to transcribe */
+static bool stt_on(void) { return CONFIG_MUSE_TTS_AZURE_KEY[0] && s_stt_wav; }
+static bool record_stt(void);
+#else
+static bool stt_on(void) { return false; }
+static bool record_stt(void) { return true; }
+#endif
 static void log_marks(void);
 static int16_t *s_pcm;       /* MINIMP3_MAX_SAMPLES_PER_FRAME */
 static int16_t *s_pcm16;     /* resampled output */
@@ -1027,6 +1035,10 @@ static void turn_begin(uint32_t gen)
         return;
     }
     if (VOICE_NOTE) {
+        if (stt_on()) {
+            s_turn.phase = P_LISTEN;   /* record_stt() keeps the note to itself */
+            return;
+        }
         if (!open_note()) {
             disconnect("chat open failed");
             turn_fail("CAN'T REACH MUSE");
@@ -1238,6 +1250,97 @@ static void text_begin(const char *text)
         muse_hatch_console("sent", nullptr, "\"bytes\":%u", (unsigned)strlen(text));
     }
 }
+
+#if CONFIG_MUSE_STT_AZURE
+/*
+ * Azure AI Speech's short-audio recognition, in CONFIG_MUSE_STT_AZURE_LANGUAGE.
+ * Writes the transcript, empty when it heard no speech; false if the request
+ * failed.
+ * ponytail: runs on this task (a second or two, 15 s at worst) and sends the
+ * note after the release; stream it while recording, on a task of its own,
+ * if the wait matters.
+ */
+static bool stt_transcribe(char *out, size_t cap)
+{
+    char url[192];
+    snprintf(url, sizeof(url),
+             "https://%s.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1"
+             "?language=%s&format=simple",
+             CONFIG_MUSE_TTS_AZURE_REGION, CONFIG_MUSE_STT_AZURE_LANGUAGE);
+    esp_http_client_config_t cfg = {};
+    cfg.url = url;
+    cfg.method = HTTP_METHOD_POST;
+    cfg.timeout_ms = 15000;
+    cfg.crt_bundle_attach = esp_crt_bundle_attach;
+    esp_http_client_handle_t h = esp_http_client_init(&cfg);
+    if (!h) {
+        return false;
+    }
+    esp_http_client_set_header(h, "Ocp-Apim-Subscription-Key", CONFIG_MUSE_TTS_AZURE_KEY);
+    esp_http_client_set_header(h, "Content-Type", "audio/wav; codecs=audio/pcm; samplerate=16000");
+    esp_http_client_set_header(h, "Accept", "application/json");
+    esp_http_client_set_header(h, "User-Agent", "MuseGadget");
+    int len = (int)(MUSE_HATCH_WAV_HEADER + s_turn.pcm_bytes);
+    int status = 0, got = 0, n;
+    char body[4096];
+    if (esp_http_client_open(h, len) == ESP_OK && esp_http_client_write(h, (const char *)s_stt_wav, len) == len
+        && esp_http_client_fetch_headers(h) >= 0) {
+        status = esp_http_client_get_status_code(h);
+        while (got < (int)sizeof(body) - 1 && (n = esp_http_client_read(h, body + got, sizeof(body) - 1 - got)) > 0) {
+            got += n;
+        }
+    }
+    esp_http_client_cleanup(h);
+    body[got] = '\0';
+    cJSON *j = status == 200 ? cJSON_Parse(body) : nullptr;
+    const char *result = cJSON_GetStringValue(cJSON_GetObjectItem(j, "RecognitionStatus"));
+    const char *text = cJSON_GetStringValue(cJSON_GetObjectItem(j, "DisplayText"));
+    bool ok = result != nullptr;
+    strlcpy(out, ok && !strcmp(result, "Success") && text ? text : "", cap);
+    if (!ok || !out[0]) {
+        ESP_LOGW(TAG, "Azure STT: HTTP %d, %s", status, result ? result : "no result");
+    }
+    cJSON_Delete(j);
+    return ok;
+}
+
+/* Records the whole note, then posts Azure's transcript of it as the message. */
+static bool record_stt(void)
+{
+    uint8_t *pcm = s_stt_wav + MUSE_HATCH_WAV_HEADER;
+    size_t got;
+    while (s_turn.pcm_bytes < NOTE_MAX_BYTES
+           && (got = xStreamBufferReceive(s_in, pcm + s_turn.pcm_bytes,
+                                          (NOTE_MAX_BYTES - s_turn.pcm_bytes) & ~(size_t)1, 0)) > 0) {
+        s_turn.pcm_bytes += got;
+    }
+    if (!s_turn.end_requested && s_turn.pcm_bytes < NOTE_MAX_BYTES) {
+        return true;
+    }
+    mark(M_RELEASE);
+    double secs = (double)s_turn.pcm_bytes / (MIC_RATE * 2);
+    if (secs < 0.3) {
+        turn_fail("DIDN'T CATCH THAT");
+        return true;
+    }
+    /* The length is known now: the header gives it, which Azure wants. */
+    uint32_t data = (uint32_t)s_turn.pcm_bytes, riff = data + MUSE_HATCH_WAV_HEADER - 8;
+    muse_hatch_wav_header(s_stt_wav, MIC_RATE);
+    memcpy(s_stt_wav + 4, &riff, 4);   /* little-endian, like the header */
+    memcpy(s_stt_wav + 40, &data, 4);
+    char text[1024];
+    if (!stt_transcribe(text, sizeof(text))) {
+        turn_fail("CAN'T REACH AZURE");
+        return true;
+    }
+    ESP_LOGI(TAG, "voice note: %.2fs, transcribed in %d ms", secs, (int)((now_us() - s_marks[M_RELEASE]) / 1000));
+    post_chat(text);   /* "DIDN'T CATCH THAT" when it's empty */
+    if (s_turn.phase == P_WAIT_REPLY) {
+        mark(M_SENT);
+    }
+    return true;
+}
+#endif
 
 static void on_dictation_line(cJSON *line)
 {
@@ -2152,7 +2255,7 @@ static void hatch_task(void *arg)
         }
         bool sent = true;
         if (s_turn.phase == P_LISTEN) {
-            sent = VOICE_NOTE ? record_note() : pump_mic();
+            sent = !VOICE_NOTE ? pump_mic() : stt_on() ? record_stt() : record_note();
         }
         if (!sent) {
             drop_connection("send failed");
@@ -2227,6 +2330,9 @@ extern "C" void muse_hatch_start(void)
     s_turn.chunk = static_cast<uint8_t *>(psram_alloc(DICT_CHUNK_BYTES + sizeof(MUSE_HATCH_NOTE_TAIL)));
     s_turn.mp3 = static_cast<uint8_t *>(psram_alloc(MP3_BUF));
     s_turn.note = VOICE_NOTE ? static_cast<uint8_t *>(psram_alloc(NOTE_PART_BYTES)) : nullptr;
+#if CONFIG_MUSE_STT_AZURE
+    s_stt_wav = static_cast<uint8_t *>(psram_alloc(MUSE_HATCH_WAV_HEADER + NOTE_MAX_BYTES));   /* voice notes go to Muse without it */
+#endif
     s_turn.texts = static_cast<char *>(psram_alloc(MAX_MSGS * TEXT_MAX));   /* captions just stay untimed without it */
     s_pcm = static_cast<int16_t *>(psram_alloc(MINIMP3_MAX_SAMPLES_PER_FRAME * sizeof(int16_t)));
     s_pcm16 = static_cast<int16_t *>(psram_alloc((MINIMP3_MAX_SAMPLES_PER_FRAME + 8) * sizeof(int16_t)));
