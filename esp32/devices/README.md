@@ -517,6 +517,9 @@ The mic is the ES7210's first channel (`mic_slot` 0); its second carries the
 speaker reference that xiaozhi uses for echo cancelling. Power off is deep
 sleep, and BOOT wakes it.
 
+Its overlay turns on `CONFIG_MUSE_LATIN_FONT`, so captions show Vietnamese
+with its tones, a line of GNU Unifont's 8x16 at a time.
+
 Coming from other firmware, erase the flash once before the first flash
 (`idf.py -p PORT erase-flash`): Muse's NVS and `prod_data` partitions sit where
 other firmware keeps its own data.
