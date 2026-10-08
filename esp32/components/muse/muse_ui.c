@@ -833,6 +833,10 @@ static void build_screen(void)
         /* It never scrolls, but LVGL would size its scrollbars from all its
          * children every time it draws any part of it. */
         lv_obj_set_scrollbar_mode(s_face, LV_SCROLLBAR_MODE_OFF);
+        /* Match the avatar's black canvas; the tile's theme background otherwise
+         * shows as a different-coloured square around the character. */
+        lv_obj_set_style_bg_color(s_face, lv_color_black(), 0);
+        lv_obj_set_style_bg_opa(s_face, LV_OPA_COVER, 0);
         s_settings = lv_tileview_add_tile(s_tv, 1, 0, LV_DIR_LEFT);
         face = s_face;
     }
@@ -1273,8 +1277,13 @@ static void update_chrome(float now)
     if (b.passkey || confirm) {
         char code[24], hint[40];
         if (confirm) {
-            strlcpy(code, s_small ? "Press" : "Press button", sizeof(code));
-            snprintf(hint, sizeof(hint), s_small ? "%s button" : "Press the %s button", muse_board->talk_button);
+            if (!muse_board->audio_init) {
+                strlcpy(code, "Tap screen", sizeof(code));
+                strlcpy(hint, "Tap to confirm pairing", sizeof(hint));
+            } else {
+                strlcpy(code, s_small ? "Press" : "Press button", sizeof(code));
+                snprintf(hint, sizeof(hint), s_small ? "%s button" : "Press the %s button", muse_board->talk_button);
+            }
         } else {
             snprintf(code, sizeof(code), "%06lu", (unsigned long)b.passkey);
             strlcpy(hint, s_small ? "Enter on phone" : "Enter it on your phone", sizeof(hint));
@@ -1292,13 +1301,13 @@ static void update_chrome(float now)
     if (s_speaker && (int)speaker != s_shown_speaker) {
         show_speaker(speaker);
     }
-    if (s_speaker && paired == lv_obj_has_flag(s_speaker, LV_OBJ_FLAG_HIDDEN)) {
-        lv_obj_set_flag(s_speaker, LV_OBJ_FLAG_HIDDEN, !paired);
+    if (s_speaker && (paired && muse_board->audio_init) == lv_obj_has_flag(s_speaker, LV_OBJ_FLAG_HIDDEN)) {
+        lv_obj_set_flag(s_speaker, LV_OBJ_FLAG_HIDDEN, !paired || !muse_board->audio_init);
     }
     /* Unpaired, a press only says "SET UP MUSE FIRST", so the mic goes too.
      * While a reply's layout is up it decides; that's only ever paired. */
-    if (s_answer < 0 && paired == lv_obj_has_flag(s_mic_icon, LV_OBJ_FLAG_HIDDEN)) {
-        lv_obj_set_flag(s_mic_icon, LV_OBJ_FLAG_HIDDEN, !paired);
+    if (s_answer < 0 && (paired && muse_board->audio_init) == lv_obj_has_flag(s_mic_icon, LV_OBJ_FLAG_HIDDEN)) {
+        lv_obj_set_flag(s_mic_icon, LV_OBJ_FLAG_HIDDEN, !paired || !muse_board->audio_init);
     }
 }
 
@@ -1566,6 +1575,9 @@ esp_err_t muse_ui_start(void)
     if (short_landscape) {
         /* Leave the header's first 40 rows and bottom captions clear. */
         s_canvas_px = s_h * 2 / 3;
+    }
+    if (muse_board->avatar_px > 0) {
+        s_canvas_px = muse_board->avatar_px;
     }
     if (s_canvas_px > s_w) {
         s_canvas_px = s_w / MUSE_PX_W * MUSE_PX_W;
