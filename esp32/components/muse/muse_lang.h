@@ -16,6 +16,8 @@
 
 #pragma once
 
+#include "lvgl.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -33,6 +35,17 @@ const char *muse_lang_status(const char *en);
 
 /* Captions ("CAN'T REACH MUSE"). */
 const char *muse_lang_message(const char *en);
+
+/* The button menu and the pairing card ("Volume", "Pairing code"). */
+const char *muse_lang_menu(const char *en);
+
+/* A Montserrat font LVGL builds in, with the language's letters to fall back
+ * on, or `font` itself. */
+const lv_font_t *muse_lang_montserrat(const lv_font_t *font);
+
+/* A label's font for its text: `plain` (unscii), or the caption font if the
+ * text has accented letters (CONFIG_MUSE_LATIN_FONT). */
+const lv_font_t *muse_lang_label_font(const char *text, const lv_font_t *plain);
 
 #ifdef __cplusplus
 }

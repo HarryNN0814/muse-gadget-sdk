@@ -18,8 +18,10 @@
 # same cell as unscii-16, for CJK punctuation, kana, every CJK Unified
 # Ideograph and the fullwidth forms. And muse_font_latin_16.c, the caption
 # font for accented letters (CONFIG_MUSE_LATIN_FONT): Unifont's 8x16 for
-# ASCII and the Latin letters with accents, Vietnamese's among them.
-# Needs curl and npx (Node.js).
+# ASCII and the Latin letters with accents, Vietnamese's among them. And
+# muse_font_vi_<px>.c, Montserrat Medium's Vietnamese letters for the menu
+# (CONFIG_MUSE_UI_LANG_VI), from the copy in the lvgl component, which needs
+# one build to be in managed_components/. Needs curl and npx (Node.js).
 set -eu
 
 VERSION=16.0.04
@@ -46,3 +48,16 @@ OUT="$HERE/components/muse/fonts/muse_font_latin_16.c"
     -r 0x20-0x7E -r 0xC0-0x17F -r 0x1A0-0x1B0 -r 0x1EA0-0x1EF9 -o font.c)
 sed -e 's|#include "lvgl/lvgl.h"|#include "lvgl.h"|' "$TMP/font.c" > "$OUT"
 echo "wrote $OUT"
+
+# Vietnamese's letters: those of Latin-1 and Latin Extended-A it uses, the
+# horned O and U, and U+1EA0-1EF9. LVGL's Montserrat has ASCII.
+VI="0xC0-0xC3,0xC8-0xCA,0xCC-0xCD,0xD2-0xD5,0xD9-0xDA,0xDD,0xE0-0xE3,0xE8-0xEA,0xEC-0xED,0xF2-0xF5,0xF9-0xFA,0xFD"
+VI="$VI,0x102-0x103,0x110-0x111,0x128-0x129,0x168-0x169,0x1A0-0x1A1,0x1AF-0x1B0,0x1EA0-0x1EF9"
+cp "$HERE/managed_components/lvgl__lvgl/scripts/built_in_font/Montserrat-Medium.ttf" "$TMP/"
+for PX in 12 14 20 28; do
+    OUT="$HERE/components/muse/fonts/muse_font_vi_$PX.c"
+    (cd "$TMP" && npx -y lv_font_conv@1.5.3 --font Montserrat-Medium.ttf --size "$PX" --bpp 4 \
+        --format lvgl --lv-font-name "muse_font_vi_$PX" --no-compress -r "$VI" -o font.c)
+    sed -e 's|#include "lvgl/lvgl.h"|#include "lvgl.h"|' "$TMP/font.c" > "$OUT"
+    echo "wrote $OUT"
+done

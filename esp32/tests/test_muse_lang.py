@@ -14,7 +14,7 @@
 
 """The screen's translations (components/muse/muse_lang.c): each is looked up
 by English text that's still in the code, keeps its format conversions, and
-draws with letters the caption fonts have."""
+draws with letters its fonts have."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MUSE = ROOT / "components" / "muse"
-ENTRY = re.compile(r'\{ "((?:[^"\\]|\\.)*)", "((?:[^"\\]|\\.)*)" \}')
+ENTRY = re.compile(r'\{ "((?:[^"\\]|\\.)*)",\s*"((?:[^"\\]|\\.)*)" \}')
 CONVERSION = re.compile(r"%[-+ #0]*\d*(?:\.\d+)?[diouxXcsfeEgGp%]")
 
 
@@ -41,8 +41,8 @@ class LangTest(unittest.TestCase):
     def setUp(self) -> None:
         self.tables = tables()
 
-    def test_both_tables_have_entries(self) -> None:
-        self.assertEqual(sorted(self.tables), ["MESSAGES", "STATUS"])
+    def test_tables_have_entries(self) -> None:
+        self.assertEqual(sorted(self.tables), ["MENU", "MESSAGES", "STATUS"])
         for name, entries in self.tables.items():
             self.assertGreater(len(entries), 10, name)
             english = [en for en, _ in entries]
@@ -70,12 +70,22 @@ class LangTest(unittest.TestCase):
             self.assertEqual(words, words.upper(), en)
 
     def test_every_letter_is_in_the_fonts(self) -> None:
-        font = (MUSE / "fonts" / "muse_font_latin_16.c").read_text(encoding="utf-8")
-        has = {int(cp, 16) for cp in re.findall(r"/\* U\+([0-9A-F]+) ", font)}
+        def glyphs(name: str) -> set[int]:
+            font = (MUSE / "fonts" / name).read_text(encoding="utf-8")
+            return {int(cp, 16) for cp in re.findall(r"/\* U\+([0-9A-F]+) ", font)}
+
+        latin = glyphs("muse_font_latin_16.c")
         for name, entries in self.tables.items():
             for en, text in entries:
-                missing = sorted({c for c in text if ord(c) not in has})
+                missing = sorted({c for c in text if ord(c) not in latin})
                 self.assertEqual(missing, [], f"{name}: {text!r}")
+        # The menu is in Montserrat too: ASCII built in, the rest from its
+        # Vietnamese letters at each size.
+        for px in (12, 14, 20, 28):
+            has = glyphs(f"muse_font_vi_{px}.c")
+            for en, text in self.tables["MENU"]:
+                missing = sorted({c for c in text if ord(c) > 0x7E and ord(c) not in has})
+                self.assertEqual(missing, [], f"{px} px: {text!r}")
 
 
 if __name__ == "__main__":
