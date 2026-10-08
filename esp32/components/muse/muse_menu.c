@@ -154,10 +154,11 @@ static const lv_font_t *s_fine;   /* the title's and pages' unscii */
 
 static lv_obj_t *label(lv_obj_t *parent, const lv_font_t *font, uint32_t color, const char *text)
 {
+    text = muse_lang_menu(text);
     lv_obj_t *l = lv_label_create(parent);
-    lv_obj_set_style_text_font(l, font, 0);
+    lv_obj_set_style_text_font(l, font == s_fine ? muse_lang_label_font(text, font) : font, 0);
     lv_obj_set_style_text_color(l, lv_color_hex(color), 0);
-    lv_label_set_text(l, muse_lang_menu(text));
+    lv_label_set_text(l, text);
     return l;
 }
 
