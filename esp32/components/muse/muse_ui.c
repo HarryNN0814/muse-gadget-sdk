@@ -56,6 +56,7 @@ static const char *TAG = "muse_ui";
 #define RING_RANGE 1000
 #define CAPTION_W 256           /* 16 columns of unscii_16, the width reply captions wrap to */
 #define CAPTION_LINE_SPACE 2
+#define LATIN_BAND_MARGIN 26    /* a small screen's accented captions clear its button icons */
 #define ART_BLANK_ROWS 3        /* Muse's art never reaches the grid's bottom rows */
 #define MINI_CELL_PX 2          /* Muse's grid cells over a reply that's read */
 #define ANSWER_MS 300           /* Muse making room for a reply, and back */
@@ -941,11 +942,13 @@ static void build_screen(void)
         muse_state_set_cjk_page(s_w / lv_font_get_glyph_width(caption_font(), 'M', ' '), 1);
 #endif
 #if CONFIG_MUSE_LATIN_FONT
-        /* Nor do accented letters: one line of Unifont's 8x16. Bigger screens
-         * page them as their other replies, Unifont being the narrower.
-         * ponytail: so those pages fill half their width; a page of their own
-         * there needs MUSE_CAPTION_MAX to allow for 3-byte letters. */
-        muse_state_set_latin_page(s_w / lv_font_get_glyph_width(&muse_font_latin_16, 'M', ' '), 1);
+        /* Nor do accented letters: one line of Unifont's 8x16, clear of the
+         * button icons in the band's corners (8 px in, up to 14 px wide) and
+         * of a case's bezel. Bigger screens page them as their other replies,
+         * Unifont being the narrower. So those pages fill half their width; a
+         * page of their own there needs MUSE_CAPTION_MAX to allow for 3-byte
+         * letters. */
+        muse_state_set_latin_page((s_w - 2 * LATIN_BAND_MARGIN) / lv_font_get_glyph_width(&muse_font_latin_16, 'M', ' '), 1);
 #endif
 
         s_bar = lv_obj_create(face);
