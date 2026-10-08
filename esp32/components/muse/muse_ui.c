@@ -35,6 +35,7 @@
 #include "muse_board.h"
 #include "muse_chat.h"
 #include "muse_console.h"
+#include "muse_lang.h"
 #include "muse_link.h"
 #include "muse_mem.h"
 #include "muse_menu.h"
@@ -494,6 +495,19 @@ static const lv_font_t *caption_font_for(const char *text, bool band)
     return band ? &lv_font_unscii_8 : caption_font();
 }
 #endif
+
+/* A label's font: `plain`, or the accented letters' if its text has them (the
+ * state label in Vietnamese). */
+static const lv_font_t *label_font(const char *text, const lv_font_t *plain)
+{
+#if CONFIG_MUSE_LATIN_FONT
+    if (muse_text_has_latin(text)) {
+        return &muse_font_latin_16;
+    }
+#endif
+    (void)text;
+    return plain;
+}
 
 static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font, uint32_t color)
 {
@@ -1353,15 +1367,16 @@ static void update_power(float now)
     muse_power_t p = muse_state_power();
     char buf[32];
     if (p.battery_pct < 0) {
-        strlcpy(buf, p.usb ? (s_small ? "USB" : "USB POWER") : "", sizeof(buf));
+        strlcpy(buf, p.usb ? (s_small ? "USB" : muse_lang_status("USB POWER")) : "", sizeof(buf));
     } else if (s_small) {
         snprintf(buf, sizeof(buf), "%s%d%%", p.charging ? "+" : "", p.battery_pct);
     } else if (p.charging) {
-        snprintf(buf, sizeof(buf), "CHARGING %d%%", p.battery_pct);
+        snprintf(buf, sizeof(buf), muse_lang_status("CHARGING %d%%"), p.battery_pct);
     } else {
-        snprintf(buf, sizeof(buf), "BATTERY %d%%", p.battery_pct);
+        snprintf(buf, sizeof(buf), muse_lang_status("BATTERY %d%%"), p.battery_pct);
     }
     if (strcmp(buf, lv_label_get_text(s_power_lbl)) != 0) {
+        lv_obj_set_style_text_font(s_power_lbl, label_font(buf, &lv_font_unscii_8), 0);
         lv_label_set_text(s_power_lbl, buf);
     }
 }
@@ -1372,7 +1387,9 @@ static void update_status(muse_mode_t mode, float now)
     const char *name = mode == MUSE_MODE_IDLE ? s_idle_name : MODE_NAMES[mode];
 
     if (name != s_shown_name) {
-        lv_label_set_text(s_state_lbl, name);
+        const char *shown = muse_lang_status(name);
+        lv_obj_set_style_text_font(s_state_lbl, label_font(shown, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16), 0);
+        lv_label_set_text(s_state_lbl, shown);
         s_shown_name = name;
     }
     if ((int)mode != s_shown_state) {
