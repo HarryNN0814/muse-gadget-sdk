@@ -25,6 +25,7 @@
 #include "freertos/event_groups.h"
 #include "freertos/semphr.h"
 
+#include "muse_lang.h"
 #include "muse_text.h"
 
 #define HAPPY_SECS 1.6f
@@ -115,8 +116,14 @@ void muse_state_set_caption(const char *fmt, ...)
     xSemaphoreTake(s_format_lock, portMAX_DELAY);
     va_list ap;
     va_start(ap, fmt);
-    vsnprintf(buf, sizeof(buf), fmt, ap);
+    /* A format the screen's language has ("LISTENING %.1fs"), then a caption
+     * passed whole as "%s" (a turn's failure). */
+    vsnprintf(buf, sizeof(buf), muse_lang_message(fmt), ap);
     va_end(ap);
+    const char *shown = muse_lang_message(buf);
+    if (shown != buf) {
+        strlcpy(buf, shown, sizeof(buf));
+    }
     muse_text_to_caption(buf, sizeof(buf));   /* replies have curly quotes and dashes */
 
     portENTER_CRITICAL(&s_lock);

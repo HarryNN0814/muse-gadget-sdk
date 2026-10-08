@@ -518,7 +518,10 @@ speaker reference that xiaozhi uses for echo cancelling. Power off is deep
 sleep, and BOOT wakes it.
 
 Its overlay turns on `CONFIG_MUSE_LATIN_FONT`, so captions show Vietnamese
-with its tones, a line of GNU Unifont's 8x16 at a time.
+with its tones, a line of GNU Unifont's 8x16 at a time, and
+`CONFIG_MUSE_UI_LANG_VI`, so the state label and the firmware's own captions
+are in Vietnamese ("SẴN SÀNG", "Không kết nối được Muse"). The serial console
+stays in English, and menus and settings aren't translated yet.
 
 Coming from other firmware, erase the flash once before the first flash
 (`idf.py -p PORT erase-flash`): Muse's NVS and `prod_data` partitions sit where
