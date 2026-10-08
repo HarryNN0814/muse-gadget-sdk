@@ -79,6 +79,7 @@ static const muse_lang_entry_t MESSAGES[] = {
     { "NOTES STILL WAITING TO SEND", "Còn tin nhắn chờ gửi" },
     /* A turn that failed */
     { "CAN'T REACH MUSE", "Không kết nối được Muse" },
+    { "CAN'T REACH AZURE", "Không kết nối được Azure" },
     { "MUSE NOT SET UP", "Chưa cài đặt Muse" },
     { "LOST CONNECTION TO MUSE", "Mất kết nối với Muse" },
     { "NO REPLY FROM MUSE", "Muse chưa trả lời" },
