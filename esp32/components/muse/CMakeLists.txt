@@ -56,6 +56,11 @@ if(CONFIG_MUSE_ENABLED)
     if(CONFIG_MUSE_LATIN_FONT)
         list(APPEND srcs "fonts/muse_font_latin_16.c")   # captions with accented letters
     endif()
+    if(CONFIG_MUSE_UI_LANG_VI)
+        # Montserrat's Vietnamese letters, for the menu and the pairing card
+        list(APPEND srcs "fonts/muse_font_vi_12.c" "fonts/muse_font_vi_14.c"
+                         "fonts/muse_font_vi_20.c" "fonts/muse_font_vi_28.c")
+    endif()
     # Your own character (tools/muse/AVATAR_RECIPE.md) stands in for the default
     # avatar when avatar/muse_pixel.c exists here; this avatar/ is gitignored. The
     # default is in avatar/ at the top of the project.

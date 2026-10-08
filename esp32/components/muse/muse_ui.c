@@ -496,18 +496,6 @@ static const lv_font_t *caption_font_for(const char *text, bool band)
 }
 #endif
 
-/* A label's font: `plain`, or the accented letters' if its text has them (the
- * state label in Vietnamese). */
-static const lv_font_t *label_font(const char *text, const lv_font_t *plain)
-{
-#if CONFIG_MUSE_LATIN_FONT
-    if (muse_text_has_latin(text)) {
-        return &muse_font_latin_16;
-    }
-#endif
-    (void)text;
-    return plain;
-}
 
 static lv_obj_t *make_label(lv_obj_t *parent, const lv_font_t *font, uint32_t color)
 {
@@ -1130,12 +1118,13 @@ static void build_overlays(void)
     lv_obj_set_style_border_width(s_pair, 2, 0);
     lv_obj_remove_flag(s_pair, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(s_pair, LV_OBJ_FLAG_HIDDEN);
-    s_pair_title = make_label(s_pair, font_pick(&lv_font_montserrat_20, FONT_COMPACT), COLOR_LIT);
-    lv_label_set_text(s_pair_title, "Pairing code");
-    s_pair_code = make_label(s_pair, font_pick(&lv_font_montserrat_28, &lv_font_montserrat_20), COLOR_ACCENT);
+    s_pair_title = make_label(s_pair, muse_lang_montserrat(font_pick(&lv_font_montserrat_20, FONT_COMPACT)), COLOR_LIT);
+    lv_label_set_text(s_pair_title, muse_lang_menu("Pairing code"));
+    s_pair_code = make_label(s_pair, muse_lang_montserrat(font_pick(&lv_font_montserrat_28, &lv_font_montserrat_20)),
+                             COLOR_ACCENT);
     lv_obj_set_style_text_letter_space(s_pair_code, s_small ? 2 : 6, 0);
-    s_pair_hint = make_label(s_pair, font_pick(&lv_font_montserrat_14, FONT_COMPACT), COLOR_DIM);
-    lv_label_set_text(s_pair_hint, s_small ? "Enter on phone" : "Enter it on your phone");
+    s_pair_hint = make_label(s_pair, muse_lang_montserrat(font_pick(&lv_font_montserrat_14, FONT_COMPACT)), COLOR_DIM);
+    lv_label_set_text(s_pair_hint, muse_lang_menu(s_small ? "Enter on phone" : "Enter it on your phone"));
     /* Wraps: "bottom right button" is wider than the AIPI's card. */
     lv_obj_set_width(s_pair_hint, lv_pct(100));
     lv_label_set_long_mode(s_pair_hint, LV_LABEL_LONG_MODE_WRAP);
@@ -1299,17 +1288,19 @@ static void update_chrome(float now)
                 strlcpy(hint, "Tap to confirm pairing", sizeof(hint));
             } else {
                 strlcpy(code, s_small ? "Press" : "Press button", sizeof(code));
-                snprintf(hint, sizeof(hint), s_small ? "%s button" : "Press the %s button", muse_board->talk_button);
+                snprintf(hint, sizeof(hint), muse_lang_menu(s_small ? "%s button" : "Press the %s button"),
+                         muse_board->talk_button);
             }
         } else {
             snprintf(code, sizeof(code), "%06lu", (unsigned long)b.passkey);
             strlcpy(hint, s_small ? "Enter on phone" : "Enter it on your phone", sizeof(hint));
         }
         const char *title = confirm ? (s_small ? "Muse app" : "Pair with Muse app") : "Pairing code";
-        if (strcmp(code, lv_label_get_text(s_pair_code)) != 0) {
-            lv_label_set_text(s_pair_code, code);
-            lv_label_set_text(s_pair_title, title);
-            lv_label_set_text(s_pair_hint, hint);
+        const char *shown = muse_lang_menu(code);
+        if (strcmp(shown, lv_label_get_text(s_pair_code)) != 0) {
+            lv_label_set_text(s_pair_code, shown);
+            lv_label_set_text(s_pair_title, muse_lang_menu(title));
+            lv_label_set_text(s_pair_hint, muse_lang_menu(hint));
         }
     }
     lv_obj_set_flag(s_pair, LV_OBJ_FLAG_HIDDEN, !b.passkey && !confirm);
@@ -1376,7 +1367,7 @@ static void update_power(float now)
         snprintf(buf, sizeof(buf), muse_lang_status("BATTERY %d%%"), p.battery_pct);
     }
     if (strcmp(buf, lv_label_get_text(s_power_lbl)) != 0) {
-        lv_obj_set_style_text_font(s_power_lbl, label_font(buf, &lv_font_unscii_8), 0);
+        lv_obj_set_style_text_font(s_power_lbl, muse_lang_label_font(buf, &lv_font_unscii_8), 0);
         lv_label_set_text(s_power_lbl, buf);
     }
 }
@@ -1388,7 +1379,7 @@ static void update_status(muse_mode_t mode, float now)
 
     if (name != s_shown_name) {
         const char *shown = muse_lang_status(name);
-        lv_obj_set_style_text_font(s_state_lbl, label_font(shown, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16), 0);
+        lv_obj_set_style_text_font(s_state_lbl, muse_lang_label_font(shown, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16), 0);
         lv_label_set_text(s_state_lbl, shown);
         s_shown_name = name;
     }
