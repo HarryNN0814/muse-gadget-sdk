@@ -98,6 +98,16 @@ int main(int argc, char **argv)
         if (muse_hatch_caption_at(in, 0, page, sizeof(page))) {
             fputs(page, stdout);
         }
+    } else if (argc > 1 && !strcmp(argv[1], "plain")) {
+        /* The reply's pieces as they stream in, split at \x1f. */
+        muse_hatch_plain_t plain = { 0 };
+        for (char *piece = in, *end; piece; piece = end ? end + 1 : NULL) {
+            end = strchr(piece, '\x1f');
+            if (end) {
+                *end = '\0';
+            }
+            fwrite(piece, 1, muse_hatch_plain(piece, &plain), stdout);
+        }
     } else if (argc > 1 && !strcmp(argv[1], "ascii")) {
         static char shown[1 << 16];
         strlcpy(shown, in, sizeof(shown));
@@ -110,7 +120,8 @@ int main(int argc, char **argv)
         muse_text_to_caption(shown, sizeof(shown));
         printf("%d:%s", muse_text_has_latin(shown), shown);
     } else {
-        fprintf(stderr, "usage: %s console|unescape|caption COLS|ascii|latin < input\n", argv[0]);
+        fprintf(stderr, "usage: %s console|unescape|caption COLS|plain|ascii|latin < input
+", argv[0]);
         return 2;
     }
     free(in);
