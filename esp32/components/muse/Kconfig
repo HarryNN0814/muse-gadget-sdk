@@ -229,6 +229,15 @@ menu "Muse"
         help
             An Azure speech-to-text locale, such as vi-VN or en-US.
 
+    config MUSE_STT_AZURE_HINT
+        string "Asked of Muse with each voice note"
+        depends on MUSE_STT_AZURE
+        default "(Trả lời ngắn gọn để đọc thành tiếng: tối đa hai câu, viết đầy đủ, không viết tắt, không dùng Markdown, trừ khi tôi muốn nghe chi tiết.)"
+        help
+            Goes to Muse after each transcript, so replies come short enough
+            to listen to; the screen shows the transcript alone. Muse takes
+            it as a request, not a limit. Empty sends the transcript alone.
+
     # Shared by both directions; the names predate speech-to-text.
     config MUSE_TTS_AZURE_KEY
         string "Azure Speech key"
