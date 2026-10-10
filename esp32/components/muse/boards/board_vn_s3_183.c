@@ -278,6 +278,23 @@ static void panel_sleep(bool sleep)
     }
 }
 
+/* Screen off on battery: LVGL stops, so the CPU can drop to the crystal clock
+ * and light-sleep (muse_input.c). */
+static void display_pause(bool pause)
+{
+    if (pause) {
+        esp_lv_adapter_pause(-1);
+    } else {
+        esp_lv_adapter_resume();
+    }
+}
+
+/* Light-sleeps until any of the three buttons moves, or the timeout. */
+static void wait_buttons(int timeout_ms)
+{
+    muse_gpio_buttons_wait((muse_gpio_button_t *const[]){ &s_talk, &s_menu, &s_up }, 3, timeout_ms);
+}
+
 /* ES8311 out and ES7210 in on one duplex I2S bus, MCLK from GPIO5. */
 static esp_err_t audio_init(esp_codec_dev_handle_t *spk, esp_codec_dev_handle_t *mic)
 {
@@ -406,9 +423,11 @@ static const muse_board_t s_board = {
     .display_unlock = esp_lv_adapter_unlock,
     .set_brightness = set_brightness,
     .panel_sleep = panel_sleep,
+    .display_pause = display_pause,
     .audio_init = audio_init,
     .mic_slot = 0,              /* MIC1; slot 1 is the speaker reference */
     .poll_buttons = poll_buttons,
+    .wait_buttons = wait_buttons,
     .read_power = read_power,
     .power_off = power_off,
 };
