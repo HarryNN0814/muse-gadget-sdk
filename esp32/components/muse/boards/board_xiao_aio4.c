@@ -16,17 +16,18 @@
 
 /*
  * XIAO 4" AIO: a Vietnamese ESP32-S3R8 board (16 MB flash, 8 MB octal PSRAM)
- * sold by Xiaozhi.vn, with a 240x320 ST7789 LCD over SPI, an ES8311 codec for
- * the speaker and an ES7210 ADC for the mics, BOOT and two more buttons (A and
- * B), a battery sense divider, an addressable LED and an SD slot. Native USB
- * Serial/JTAG. It ships with Xiaozhi.vn's xiaozhi firmware, where it's
- * esp32-s3-40.
+ * sold by Xiaozhi.vn, with a 4" 320x480 LCD over SPI that takes the ST7789's
+ * commands, an ES8311 codec for the speaker and an ES7210 ADC for the mics,
+ * BOOT and two more buttons (A and B), a battery sense divider, an addressable
+ * LED and an SD slot. Native USB Serial/JTAG. It ships with Xiaozhi.vn's
+ * xiaozhi firmware, where it's esp32-s3-40.
  *
  * Pins are the vendor's pin table (XIAO_4" AIO, ESP32-S3 V1). That firmware's
  * boot log confirms the LCD's (MOSI 11, SCLK 12, CS 14, DC 13, RST 9, BL 15),
  * the ES8311 and ES7210 on one duplex I2S bus, and the battery on ADC1 channel
- * 2 (GPIO3). It drives the panel with ESP-IDF's ST7789 driver, and has no touch
- * driver. The battery levels are the table in that firmware's image.
+ * 2 (GPIO3). It drives the panel with ESP-IDF's ST7789 driver, upright in
+ * portrait with USB at the bottom, and has no touch driver. The battery
+ * levels are the table in that firmware's image.
  *
  * Like the other xiaozhi BoxAudioCodec boards, the ES7210's first channel is
  * the voice and its second the speaker reference, so Muse takes slot 0.
@@ -54,8 +55,8 @@
 
 static const char *TAG = "board";
 
-#define LCD_H_RES 320          /* landscape: the panel's 240x320 turned */
-#define LCD_V_RES 240
+#define LCD_H_RES 320          /* portrait, as the vendor firmware draws it */
+#define LCD_V_RES 480
 #define LCD_HOST SPI2_HOST
 #define LCD_SCLK GPIO_NUM_12
 #define LCD_MOSI GPIO_NUM_11
@@ -161,8 +162,7 @@ static lv_display_t *display_start(lv_indev_t **touch)
     }
     esp_lcd_panel_reset(s_panel);
     esp_lcd_panel_init(s_panel);
-    esp_lcd_panel_swap_xy(s_panel, true);
-    esp_lcd_panel_mirror(s_panel, true, false);
+    esp_lcd_panel_mirror(s_panel, false, false);
     esp_lcd_panel_invert_color(s_panel, true);
     esp_lcd_panel_disp_on_off(s_panel, true);
 
