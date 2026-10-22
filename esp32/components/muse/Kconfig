@@ -114,6 +114,9 @@ menu "Muse"
         config MUSE_BOARD_VN_S3_183
             bool "VN ESP32-S3 board (1.83\" 284x240 NV3023 LCD, ES8311 and ES7210)"
             depends on IDF_TARGET_ESP32S3
+        config MUSE_BOARD_XIAO_AIO4
+            bool "XIAO 4\" AIO (ESP32-S3, 320x240 ST7789 LCD, ES8311 and ES7210)"
+            depends on IDF_TARGET_ESP32S3
         config MUSE_BOARD_AI_PASSPORT
             bool "FoloToy AI Passport (ESP32-C3, three buttons, no touch)"
             depends on IDF_TARGET_ESP32C3
@@ -156,6 +159,7 @@ menu "Muse"
         default "waveshare_s3_lcd7" if MUSE_BOARD_WAVESHARE_S3_LCD7
         default "waveshare_s3_lcd128" if MUSE_BOARD_WAVESHARE_S3_LCD128
         default "vn_s3_183" if MUSE_BOARD_VN_S3_183
+        default "xiao_aio4" if MUSE_BOARD_XIAO_AIO4
         default "ai_passport" if MUSE_BOARD_AI_PASSPORT
         default "waveshare_p4_lcd35" if MUSE_BOARD_WAVESHARE_P4_LCD35
         default "p4r_lcd43" if MUSE_BOARD_P4R_LCD43
@@ -222,6 +226,98 @@ menu "Muse"
             one 16 px line at a time. Takes about 850 KB of flash and no RAM.
             Without it those characters show as boxes. Hangul isn't
             included.
+
+    config MUSE_LATIN_FONT
+        bool "Show Vietnamese and other accented letters in captions"
+        depends on MUSE_ENABLED
+        default n
+        help
+            Without it, captions show accented Latin letters as their plain
+            ones. With it, a caption with any in it (Latin-1, Latin
+            Extended-A, the horned O and U, and Vietnamese's U+1EA0-1EF9)
+            shows in GNU Unifont's 8x16 bitmaps, the whole caption in that
+            one font. Small screens show such a caption one 16 px line at a
+            time. Takes about 10 KB of flash and no RAM.
+
+    choice MUSE_UI_LANGUAGE
+        prompt "Language of the screen's own text"
+        depends on MUSE_ENABLED
+        default MUSE_UI_LANG_EN
+        help
+            The state label ("READY") and the captions the firmware shows
+            itself ("CAN'T REACH MUSE"). Muse's replies are in whatever
+            language you speak to it, and the serial console stays in
+            English for the tools that read it. Menus and settings aren't
+            translated yet.
+
+        config MUSE_UI_LANG_EN
+            bool "English"
+
+        config MUSE_UI_LANG_VI
+            bool "Vietnamese"
+            select MUSE_LATIN_FONT
+    endchoice
+
+    config MUSE_TTS_AZURE
+        bool "Speak replies with Azure AI Speech"
+        depends on (MUSE_ENABLED || HOMEHUB_VOICE) && SPIRAM
+        default n
+        help
+            Muse replies in text. With this on, each reply message goes to
+            Azure AI Speech and the MP3 it returns plays on the speaker,
+            the captions following it. If the request fails, the reply is
+            shown at reading pace as without it. Needs a Speech resource's
+            key and region (portal.azure.com). The key ships inside the
+            firmware, like the SDK token: keep it out of git and revoke it
+            if it leaks.
+
+    config MUSE_STT_AZURE
+        bool "Transcribe voice notes with Azure AI Speech"
+        depends on MUSE_HATCH
+        default n
+        help
+            Muse guesses a voice note's language, and can take one it knows
+            less well for another it knows better (Vietnamese for Thai, say).
+            With this on, the note streams to Azure AI Speech while it's
+            recorded, in the language set below, and its transcript goes to
+            Muse as the message. A press under a second, or one Azure hears
+            no speech in, sends nothing. Uses the same Speech key and region
+            as the replies' speech.
+
+    config MUSE_STT_AZURE_LANGUAGE
+        string "Voice note language"
+        depends on MUSE_STT_AZURE
+        default "vi-VN"
+        help
+            An Azure speech-to-text locale, such as vi-VN or en-US.
+
+    config MUSE_STT_AZURE_HINT
+        string "Asked of Muse with each voice note"
+        depends on MUSE_STT_AZURE
+        default "(Trả lời ngắn gọn để đọc thành tiếng: tối đa hai câu, viết đầy đủ, không viết tắt, không dùng Markdown, trừ khi tôi muốn nghe chi tiết.)"
+        help
+            Goes to Muse after each transcript, so replies come short enough
+            to listen to; the screen shows the transcript alone. Muse takes
+            it as a request, not a limit. Empty sends the transcript alone.
+
+    # Shared by both directions; the names predate speech-to-text.
+    config MUSE_TTS_AZURE_KEY
+        string "Azure Speech key"
+        depends on MUSE_TTS_AZURE || MUSE_STT_AZURE
+        default ""
+
+    config MUSE_TTS_AZURE_REGION
+        string "Azure Speech region"
+        depends on MUSE_TTS_AZURE || MUSE_STT_AZURE
+        default "southeastasia"
+
+    config MUSE_TTS_AZURE_VOICE
+        string "Azure voice"
+        depends on MUSE_TTS_AZURE
+        default "vi-VN-HoaiMyNeural"
+        help
+            Any Azure neural voice, such as vi-VN-NamMinhNeural or
+            en-US-AvaNeural. Its name starts with its language.
 
     config MUSE_JC3248W535_MIC_GPIO
         int "JC3248W535: GPIO for an external I2S mic's data (SD) line"

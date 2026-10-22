@@ -26,6 +26,8 @@
 #              Home Assistant Voice PE (ESP32-S3), push-to-talk voice chat
 #   seeed-respeaker-lite
 #              reSpeaker Lite with XIAO ESP32-S3 (experimental voice profile)
+#   breadboard-s3-voice
+#              ESP32-S3 N16R8 with an INMP441 mic and a MAX98357A amp, push-to-talk
 #   reterminal-e1001
 #              Seeed reTerminal E1001 (ESP32-S3) with a 7.5 inch e-paper
 #   reterminal-e1002
@@ -89,7 +91,7 @@ case "$BOARD" in
     DEFAULTS="$DEFAULTS;devices/sdkconfig.$BOARD"
     PORTS="/dev/cu.usbserial-* /dev/cu.wchusbserial* /dev/ttyUSB* /dev/cu.usbmodem* /dev/ttyACM*"
     ;;
-  home-assistant-voice|seeed-respeaker-lite)
+  home-assistant-voice|seeed-respeaker-lite|breadboard-s3-voice)
     TARGET=esp32s3
     DEFAULTS="$DEFAULTS;devices/sdkconfig.$BOARD"
     # The S3's own USB-Serial-JTAG, which looks like a DevKitC-1's; check

@@ -58,6 +58,7 @@ before adding a feature to one.
 | Seeed reTerminal Sticky Link status (experimental) | `esp32s3` | `devices/sdkconfig.reterminal-sticky-link` | `tools/board.sh reterminal-sticky-link` |
 | Home Assistant Voice Preview Edition | `esp32s3` | `devices/sdkconfig.home-assistant-voice` | `tools/board.sh home-assistant-voice` |
 | Seeed reSpeaker Lite with XIAO ESP32-S3 (experimental) | `esp32s3` | `devices/sdkconfig.seeed-respeaker-lite` | `tools/board.sh seeed-respeaker-lite` |
+| ESP32-S3 breadboard (N16R8, INMP441, MAX98357A) | `esp32s3` | `devices/sdkconfig.breadboard-s3-voice` | `tools/board.sh breadboard-s3-voice` |
 | Waveshare ESP32-S3-Touch-AMOLED-1.75C | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175c` | manual (below) |
 | Waveshare ESP32-S3-Touch-AMOLED-1.75 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-175` | manual (below) |
 | Waveshare ESP32-S3-Touch-AMOLED-2.16 | `esp32s3` | `devices/sdkconfig.muse;devices/sdkconfig.muse-waveshare-s3-216` | `tools/muse/board.sh build s3-216` |
@@ -442,7 +443,8 @@ physical talk/setup button, so the GPIO button reset gesture does not apply.
 
 The device advertises as `MuseGadget-XXXXXX` (`MuseGadget-Disp-XXXXXX` on the
 ideaspark, SenseCAP Indicator and reTerminal E1001 and E1002 overlays, `MuseGadget-ha-voice-XXXXXX` on the
-Voice PE, `MuseGadget-respeaker-XXXXXX` on the reSpeaker Lite). It uses
+Voice PE, `MuseGadget-respeaker-XXXXXX` on the reSpeaker Lite, `MuseGadget-voice-XXXXXX`
+on the breadboard). It uses
 **community pairing v5**, so the phone app must support v5
 and list community devices. Community pairing needs the explicit device press but has no
 manufacturer attestation, and it doesn't stop an active man-in-the-middle.

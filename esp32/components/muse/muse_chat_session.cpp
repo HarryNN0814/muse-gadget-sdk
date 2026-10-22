@@ -51,6 +51,9 @@
 
 #include "esp_attr.h"
 #include "esp_crt_bundle.h"
+#if CONFIG_MUSE_TTS_AZURE || CONFIG_MUSE_STT_AZURE
+#include "esp_http_client.h"
+#endif
 #include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "esp_random.h"
@@ -105,7 +108,8 @@ static const char *TAG = "muse_chat_session";
 #define MP3_POLL_ROOM (SCRATCH + 8192)     /* stop reading the socket below this much MP3 room */
 static_assert(MP3_BUF > MP3_POLL_ROOM + MP3_HOLD, "reads would stall with the MP3 buffer empty");
 #define EV_TEXT 72
-#define TEXT_MAX 1024                      /* a message's text, for captions timed to its speech */
+#define TEXT_MAX 4096                      /* a message's text, for captions timed to its speech; Vietnamese
+                                              takes 2-3 bytes a letter, and a long reply 2 KB */
 #define SPEECH_CHARS_PER_S 14              /* until the speech's length is known */
 #define TEXT_CHARS_PER_S 16                /* speaker off: reading pace, a little over speech */
 #define TEXT_HOLD_S 2                      /* speaker off: how long a message's last lines stay up */
@@ -154,6 +158,9 @@ static QueueHandle_t s_cmds, s_events;
 static StreamBufferHandle_t s_in, s_out;
 static std::atomic<uint32_t> s_gen{0};
 static std::atomic<bool> s_resting{false};
+#if CONFIG_MUSE_TTS_AZURE
+static std::atomic<uint32_t> s_tts_job{0};   /* the Azure fetch the turn wants; see tts_start() */
+#endif
 
 /* ---- Connection ---- */
 
@@ -209,6 +216,8 @@ struct msg_t {
     tts_t tts;
     uint32_t pcm_start;      /* where its speech starts in the reply audio */
     uint32_t pcm_frames;     /* how long it is; 0 until the MP3 has all arrived */
+    size_t spoken;           /* its text sent for speech so far, a sentence or more at a time */
+    muse_hatch_plain_t plain;   /* its Markdown's marks, dropped as the text streams in */
 };
 
 struct resampler_t {
@@ -251,6 +260,9 @@ struct turn_t {
     resampler_t down;
     int kbps;
     int down_rate;
+    bool fetching;           /* a piece of the message's speech is on its way */
+    bool piece_in;           /* the last piece has all arrived; the next isn't asked for yet */
+    bool tts_failed;         /* Azure failed this turn: the rest is shown unspoken */
 };
 
 /* 10 KB, most of it the MP3 decoder: in PSRAM on boards that let static data go
@@ -265,6 +277,23 @@ static char s_reply_shown[EV_TEXT];   /* the pre-speech caption last sent */
 
 static void mark(mark_t m);
 static bool open_note(void);
+#if CONFIG_MUSE_STT_AZURE
+static bool stt_on(void) { return CONFIG_MUSE_TTS_AZURE_KEY[0] != 0; }
+static bool stt_open(void);
+static void stt_close(void);
+static bool record_stt(void);
+#else
+static bool stt_on(void) { return false; }
+static bool stt_open(void) { return false; }
+static void stt_close(void) {}
+static bool record_stt(void) { return true; }
+#endif
+#if CONFIG_MUSE_TTS_AZURE
+static bool tts_azure(void);
+static size_t tts_piece(int i);
+static int tts_next(int i);
+static void tts_warm(void);
+#endif
 static void log_marks(void);
 static int16_t *s_pcm;       /* MINIMP3_MAX_SAMPLES_PER_FRAME */
 static int16_t *s_pcm16;     /* resampled output */
@@ -961,11 +990,15 @@ static void turn_reset_streams(void)
 static void turn_finish(void)
 {
     turn_reset_streams();
+    stt_close();
     s_turn.phase = P_IDLE;
     s_turn.dict_id = s_turn.chat_id = 0;
     s_turn.tts_msg = -1;
     s_turn.silent = false;
     s_turn.mp3_len = 0;
+#if CONFIG_MUSE_TTS_AZURE
+    s_tts_job++;   /* a fetch still running stops */
+#endif
 }
 
 static void turn_fail(const char *why)
@@ -1026,6 +1059,14 @@ static void turn_begin(uint32_t gen)
         return;
     }
     if (VOICE_NOTE) {
+        if (stt_on()) {
+            if (!stt_open()) {
+                turn_fail("CAN'T REACH AZURE");
+                return;
+            }
+            s_turn.phase = P_LISTEN;   /* record_stt() streams the note to Azure */
+            return;
+        }
         if (!open_note()) {
             disconnect("chat open failed");
             turn_fail("CAN'T REACH MUSE");
@@ -1221,6 +1262,14 @@ static void post_chat(const char *text)
     }
     ESP_LOGI(TAG, "heard: \"%s\"", text);
     emit(MUSE_HATCH_EV_HEARD, text);
+#if CONFIG_MUSE_STT_AZURE
+    if (CONFIG_MUSE_STT_AZURE_HINT[0]) {
+        char message[1024 + sizeof(CONFIG_MUSE_STT_AZURE_HINT) + 1];
+        snprintf(message, sizeof(message), "%s %s", text, CONFIG_MUSE_STT_AZURE_HINT);
+        send_chat(message, "text");
+        return;
+    }
+#endif
     send_chat(text, "text");
 }
 
@@ -1237,6 +1286,151 @@ static void text_begin(const char *text)
         muse_hatch_console("sent", nullptr, "\"bytes\":%u", (unsigned)strlen(text));
     }
 }
+
+#if CONFIG_MUSE_STT_AZURE
+/*
+ * Azure AI Speech's short-audio recognition, in CONFIG_MUSE_STT_AZURE_LANGUAGE.
+ * The request opens at the press and the note streams up in chunks while it's
+ * recorded, so after the release only the last chunk and the recognition are
+ * left to wait for. The calls block this task: the connection at the press,
+ * the result after the release (about a second each).
+ */
+#define STT_PART (MIC_RATE * 2 / 10)   /* 100 ms of PCM per HTTP chunk */
+#define STT_MIN_S 1.0                  /* a shorter press is a slip, or stops a reply: not sent */
+
+static esp_http_client_handle_t s_stt;
+
+static void stt_close(void)
+{
+    if (s_stt) {
+        esp_http_client_cleanup(s_stt);
+        s_stt = nullptr;
+    }
+}
+
+/* Sends the s_turn.chunk_len bytes staged at s_turn.chunk + 6 as one chunk; an empty one ends the body. */
+static bool stt_flush(void)
+{
+    char *c = reinterpret_cast<char *>(s_turn.chunk);
+    size_t n = s_turn.chunk_len;
+    char head[7];
+    snprintf(head, sizeof(head), "%04x\r\n", (unsigned)n);
+    memcpy(c, head, 6);
+    memcpy(c + 6 + n, "\r\n", 2);
+    int len = (int)(6 + n + 2);
+    s_turn.chunk_len = 0;
+    return esp_http_client_write(s_stt, c, len) == len;
+}
+
+/* Opens the note's request, its WAV header the first chunk; false if Azure can't be reached. */
+static bool stt_open(void)
+{
+    char url[192];
+    snprintf(url, sizeof(url),
+             "https://%s.stt.speech.microsoft.com/speech/recognition/conversation/cognitiveservices/v1"
+             "?language=%s&format=simple",
+             CONFIG_MUSE_TTS_AZURE_REGION, CONFIG_MUSE_STT_AZURE_LANGUAGE);
+    esp_http_client_config_t cfg = {};
+    cfg.url = url;
+    cfg.method = HTTP_METHOD_POST;
+    cfg.timeout_ms = 15000;
+    cfg.crt_bundle_attach = esp_crt_bundle_attach;
+    s_stt = esp_http_client_init(&cfg);
+    if (!s_stt) {
+        return false;
+    }
+    esp_http_client_set_header(s_stt, "Ocp-Apim-Subscription-Key", CONFIG_MUSE_TTS_AZURE_KEY);
+    esp_http_client_set_header(s_stt, "Content-Type", "audio/wav; codecs=audio/pcm; samplerate=16000");
+    esp_http_client_set_header(s_stt, "Accept", "application/json");
+    esp_http_client_set_header(s_stt, "User-Agent", "MuseGadget");
+    /* -1: Transfer-Encoding: chunked, framed by stt_flush(). The header gives
+     * the streaming "unknown" length, as the note to Muse does. */
+    muse_hatch_wav_header(s_turn.chunk + 6, MIC_RATE);
+    s_turn.chunk_len = MUSE_HATCH_WAV_HEADER;
+    if (esp_http_client_open(s_stt, -1) != ESP_OK || !stt_flush()) {
+        ESP_LOGW(TAG, "Azure STT: can't connect");
+        stt_close();
+        return false;
+    }
+    return true;
+}
+
+/* Ends the body and reads the result: the transcript, empty when Azure heard no speech; false if the request failed. */
+static bool stt_result(char *out, size_t cap)
+{
+    int status = 0, got = 0, n;
+    char body[4096];
+    if ((!s_turn.chunk_len || stt_flush()) && stt_flush() && esp_http_client_fetch_headers(s_stt) >= 0) {
+        status = esp_http_client_get_status_code(s_stt);
+        while (got < (int)sizeof(body) - 1 && (n = esp_http_client_read(s_stt, body + got, sizeof(body) - 1 - got)) > 0) {
+            got += n;
+        }
+    }
+    stt_close();
+    body[got] = '\0';
+    cJSON *j = status == 200 ? cJSON_Parse(body) : nullptr;
+    const char *result = cJSON_GetStringValue(cJSON_GetObjectItem(j, "RecognitionStatus"));
+    const char *text = cJSON_GetStringValue(cJSON_GetObjectItem(j, "DisplayText"));
+    bool ok = result != nullptr;
+    strlcpy(out, ok && !strcmp(result, "Success") && text ? text : "", cap);
+    if (!ok || !out[0]) {
+        ESP_LOGW(TAG, "Azure STT: HTTP %d, %s", status, result ? result : "no result");
+    }
+    cJSON_Delete(j);
+    return ok;
+}
+
+/* Streams the note to Azure as it's recorded, then posts Azure's transcript of it as the message. */
+static bool record_stt(void)
+{
+    for (;;) {
+        size_t room = STT_PART - s_turn.chunk_len;
+        size_t left = NOTE_MAX_BYTES - s_turn.pcm_bytes;
+        room = (room < left ? room : left) & ~(size_t)1;
+        size_t got = room ? xStreamBufferReceive(s_in, s_turn.chunk + 6 + s_turn.chunk_len, room, 0) : 0;
+        if (!got) {
+            break;
+        }
+        s_turn.chunk_len += got;
+        s_turn.pcm_bytes += got;
+        if (s_turn.chunk_len == STT_PART && !stt_flush()) {
+            turn_fail("CAN'T REACH AZURE");
+            return true;
+        }
+    }
+    if (!s_turn.end_requested && s_turn.pcm_bytes < NOTE_MAX_BYTES) {
+        return true;
+    }
+    mark(M_RELEASE);
+    double secs = (double)s_turn.pcm_bytes / (MIC_RATE * 2);
+    char text[1024] = "";
+    /* Nothing to send ends the turn as done rather than failed, so the note
+     * isn't saved to try again. */
+    if (secs < STT_MIN_S) {
+        ESP_LOGI(TAG, "voice note: %.2fs, too short to send", secs);
+        turn_done(true);
+        return true;
+    }
+    if (!stt_result(text, sizeof(text))) {
+        turn_fail("CAN'T REACH AZURE");
+        return true;
+    }
+    ESP_LOGI(TAG, "voice note: %.2fs, transcribed %d ms after the release", secs,
+             (int)((now_us() - s_marks[M_RELEASE]) / 1000));
+    if (!text[0]) {
+        turn_done(true);
+        return true;
+    }
+    post_chat(text);
+    if (s_turn.phase == P_WAIT_REPLY) {
+        mark(M_SENT);
+#if CONFIG_MUSE_TTS_AZURE
+        tts_warm();
+#endif
+    }
+    return true;
+}
+#endif
 
 static void on_dictation_line(cJSON *line)
 {
@@ -1331,15 +1525,27 @@ static int bind_msg(const char *id, cJSON *payload)
     return s_turn.nmsgs++;
 }
 
-static void append_text(msg_t &m, const char *text)
+/* Adds a piece of the message's text, without its Markdown (in place: text is the event's). */
+static void append_text(msg_t &m, char *text)
 {
-    size_t add = strlen(text);
+    size_t add = muse_hatch_plain(text, &m.plain);
     if (s_turn.texts) {
         char *full = s_turn.texts + (&m - s_turn.msgs) * TEXT_MAX;
         if (!m.len) {
             full[0] = '\0';
         }
-        strlcat(full, text, TEXT_MAX);
+        if (strlcat(full, text, TEXT_MAX) >= TEXT_MAX) {
+            /* Cut short: not mid-character, which the speech's SSML can't have. */
+            size_t end = TEXT_MAX - 1, start = end;
+            while (start && (full[start - 1] & 0xC0) == 0x80) {
+                start--;
+            }
+            unsigned char lead = start ? (unsigned char)full[start - 1] : 0;
+            size_t need = lead >= 0xF0 ? 4 : lead >= 0xE0 ? 3 : lead >= 0xC0 ? 2 : 1;
+            if (start && end - (start - 1) < need) {
+                full[start - 1] = '\0';
+            }
+        }
     }
     m.len += add;
     size_t have = strlen(m.tail);
@@ -1375,7 +1581,7 @@ static void show_reply_start(const msg_t &m)
     }
 }
 
-static void message_done(int i, const char *final_text)
+static void message_done(int i, char *final_text)
 {
     msg_t &m = s_turn.msgs[i];
     if (m.done) {
@@ -1464,7 +1670,7 @@ static void on_event(cJSON *line)
     s_turn.last_event_us = s_turn.last_content_us = now_us();
     msg_t &m = s_turn.msgs[i];
     if (append) {
-        const char *text = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "text"));
+        char *text = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "text"));
         if (text && text[0] && s_turn.text) {
             mark(M_TEXT);
             m.len += strlen(text);
@@ -1473,9 +1679,14 @@ static void on_event(cJSON *line)
             mark(M_TEXT);
             append_text(m, text);
             show_reply_start(m);   /* ignored once the speech starts */
+#if CONFIG_MUSE_TTS_AZURE
+            if (m.tts == TTS_NONE && tts_azure() && tts_piece(i)) {
+                m.tts = TTS_QUEUED;   /* a sentence is in: say it while the rest comes */
+            }
+#endif
         }
     } else if (done || full) {
-        const char *text = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "display_text"));
+        char *text = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "display_text"));
         if (!text) {
             text = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "content"));
         }
@@ -1533,6 +1744,38 @@ static void start_tts(void)
          * end. decode() plays it at the speaker's volume, captions following,
          * and finishes the message once it's drained.
          */
+#if CONFIG_MUSE_TTS_AZURE
+        if (tts_azure()) {
+            int r = tts_next(i);
+            if (r > 0) {
+                m.pcm_start = s_turn.pcm_out;
+                m.pcm_frames = 0;
+                m.tts = TTS_ACTIVE;
+                s_turn.tts_msg = i;
+                s_turn.silent = false;
+                s_turn.mp3_len = 0;
+                s_turn.mp3_ended = false;
+                s_turn.kbps = 0;
+                s_turn.down_rate = 0;
+                mp3dec_init(&s_turn.dec);
+                mark(M_TTS);
+                ESP_LOGI(TAG, "speaking message %s (%u chars so far)", m.id, (unsigned)m.len);
+                show_reply_start(m);
+                return;
+            }
+            if (r == 0 && !(m.done && m.spoken >= strlen(s_turn.texts + i * TEXT_MAX))) {
+                return;   /* Azure's busy, or the next sentence isn't written yet */
+            }
+            if (r == 0) {
+                m.tts = TTS_FINISHED;   /* nothing in it to say */
+                continue;
+            }
+            s_turn.tts_failed = true;
+        }
+        if (!m.done) {
+            return;   /* shown unspoken, it's paced by its whole length */
+        }
+#endif
         m.pcm_start = s_turn.pcm_out;
         m.pcm_frames = (uint32_t)(m.len * MIC_RATE / TEXT_CHARS_PER_S);
         m.tts = TTS_ACTIVE;
@@ -1570,6 +1813,285 @@ static void tts_end(stream_t *s, bool ok)
     }
 }
 
+#if CONFIG_MUSE_TTS_AZURE
+/*
+ * Azure AI Speech, on a task of its own so this one never waits on it. A
+ * reply is spoken a sentence at a time while it streams in: each piece of it
+ * goes in one request, and their MP3s play one after another, tts_poll()
+ * sending the next piece once one has arrived. The HTTPS connection stays
+ * open between requests, and a voice turn opens it while Muse thinks
+ * (tts_warm), so the speech starts without a TLS handshake. A cancelled turn
+ * bumps s_tts_job, and the rest of its download is dropped.
+ */
+#define TTS_MP3_STREAM (32 * 1024)
+#define TTS_WARM_US (120 * 1000000LL)   /* reuse an idle connection this long (Azure kept one 3 minutes) */
+
+struct tts_job_t {
+    uint32_t job;
+    bool warm;               /* only opens the connection: its audio is dropped */
+    size_t got;              /* MP3 bytes received */
+    int64_t start_us, first_us;
+    char ssml[];
+};
+
+static StreamBufferHandle_t s_tts_mp3;
+static std::atomic<int> s_tts_result{0};       /* the current job's: 0 running, 1 done, -1 failed */
+static std::atomic<bool> s_tts_busy{false};
+static std::atomic<int64_t> s_tts_used_us{0};  /* when the open connection last answered; 0 if none is */
+static esp_http_client_handle_t s_tts_http;    /* tts_task's, kept between jobs */
+
+/* Whether replies go to Azure: the speaker's on, and Azure hasn't failed this turn. */
+static bool tts_azure(void)
+{
+    return s_turn.texts && CONFIG_MUSE_TTS_AZURE_KEY[0] && muse_settings_speaker_on() && !s_turn.tts_failed;
+}
+
+/* Whether byte k of t ends a sentence: . ! ? or an ellipsis before a space, or a line's end. */
+static bool sentence_end(const char *t, size_t k)
+{
+    if (t[k] == '\n') {
+        return true;
+    }
+    bool mark = t[k] == '.' || t[k] == '!' || t[k] == '?'
+                || (k >= 2 && t[k - 2] == '\xE2' && t[k - 1] == '\x80' && t[k] == '\xA6');
+    return mark && (t[k + 1] == ' ' || t[k + 1] == '\n');
+}
+
+/* How many bytes of message i to say next: up to its last finished sentence
+ * while it streams in, all the rest once it's done; 0 if none yet. */
+static size_t tts_piece(int i)
+{
+    const msg_t &m = s_turn.msgs[i];
+    const char *text = s_turn.texts + i * TEXT_MAX;
+    size_t len = strlen(text), end = m.spoken;
+    if (m.done) {
+        return len - m.spoken;
+    }
+    for (size_t k = m.spoken; k + 1 < len; k++) {
+        if (sentence_end(text, k)) {
+            end = k + 1;
+        }
+    }
+    return end - m.spoken;
+}
+
+/* SSML for n bytes of text in one PSRAM block (a short pause for no text), or NULL. */
+static tts_job_t *tts_job_new(const char *text, size_t n)
+{
+    static const char head[] = "<speak version='1.0' xml:lang='%.*s'><voice name='%s'>";
+    static const char pause[] = "<break time='1ms'/>";
+    static const char tail[] = "</voice></speak>";
+    const char *voice = CONFIG_MUSE_TTS_AZURE_VOICE;
+    const char *dash = strchr(voice, '-');
+    dash = dash ? strchr(dash + 1, '-') : nullptr;
+    int lang = dash ? (int)(dash - voice) : (int)strlen(voice);   /* "vi-VN" of "vi-VN-HoaiMyNeural" */
+    size_t cap = sizeof(head) + strlen(voice) * 2 + n * 6 + sizeof(pause) + sizeof(tail);
+    tts_job_t *j = static_cast<tts_job_t *>(psram_alloc(sizeof(tts_job_t) + cap));
+    if (!j) {
+        return nullptr;
+    }
+    *j = tts_job_t{};
+    size_t o = snprintf(j->ssml, cap, head, lang, voice, voice);
+    if (!text) {
+        o += strlcpy(j->ssml + o, pause, cap - o);
+    }
+    for (size_t k = 0; text && k < n; k++) {
+        char c = text[k];
+        const char *e = c == '&' ? "&amp;" : c == '<' ? "&lt;" : c == '>' ? "&gt;"
+                      : c == '"' ? "&quot;" : c == '\'' ? "&apos;" : nullptr;
+        if (e) {
+            o += strlcpy(j->ssml + o, e, cap - o);
+        } else {
+            j->ssml[o++] = c;
+        }
+    }
+    strlcpy(j->ssml + o, tail, cap - o);
+    return j;
+}
+
+/* Moves the MP3 on as it arrives; a cancelled turn's, or a warm-up's, is dropped. */
+static esp_err_t tts_on_http(esp_http_client_event_t *e)
+{
+    tts_job_t *j = static_cast<tts_job_t *>(e->user_data);
+    if (e->event_id != HTTP_EVENT_ON_DATA || !j || esp_http_client_get_status_code(e->client) != 200) {
+        return ESP_OK;
+    }
+    if (!j->got) {
+        j->first_us = esp_timer_get_time();
+    }
+    j->got += e->data_len;
+    const uint8_t *data = static_cast<const uint8_t *>(e->data);
+    for (int sent = 0; !j->warm && sent < e->data_len && j->job == s_tts_job.load();) {
+        sent += xStreamBufferSend(s_tts_mp3, data + sent, e->data_len - sent, pdMS_TO_TICKS(100));
+    }
+    return ESP_OK;
+}
+
+static void tts_task(void *arg)
+{
+    tts_job_t *j = static_cast<tts_job_t *>(arg);
+    if (!s_tts_http) {
+        char url[96];
+        snprintf(url, sizeof(url), "https://%s.tts.speech.microsoft.com/cognitiveservices/v1",
+                 CONFIG_MUSE_TTS_AZURE_REGION);
+        esp_http_client_config_t cfg = {};
+        cfg.url = url;
+        cfg.method = HTTP_METHOD_POST;
+        cfg.timeout_ms = 10000;
+        cfg.buffer_size = 2048;
+        cfg.crt_bundle_attach = esp_crt_bundle_attach;
+        cfg.event_handler = tts_on_http;
+        s_tts_http = esp_http_client_init(&cfg);
+        if (s_tts_http) {
+            esp_http_client_set_header(s_tts_http, "Ocp-Apim-Subscription-Key", CONFIG_MUSE_TTS_AZURE_KEY);
+            esp_http_client_set_header(s_tts_http, "Content-Type", "application/ssml+xml");
+            esp_http_client_set_header(s_tts_http, "X-Microsoft-OutputFormat", "audio-16khz-32kbitrate-mono-mp3");
+            esp_http_client_set_header(s_tts_http, "User-Agent", "MuseGadget");
+        }
+    }
+    bool ok = false, reused = s_tts_used_us.load() != 0;
+    int status = 0;
+    if (s_tts_http) {
+        esp_http_client_set_user_data(s_tts_http, j);
+        esp_http_client_set_post_field(s_tts_http, j->ssml, (int)strlen(j->ssml));
+        j->start_us = esp_timer_get_time();
+        esp_err_t err = esp_http_client_perform(s_tts_http);
+        if (err != ESP_OK && reused && !j->got) {
+            /* Azure closed the idle connection: once more, on a new one. */
+            esp_http_client_close(s_tts_http);
+            reused = false;
+            err = esp_http_client_perform(s_tts_http);
+        }
+        status = esp_http_client_get_status_code(s_tts_http);
+        ok = err == ESP_OK && status == 200;
+        if (!ok) {
+            esp_http_client_close(s_tts_http);
+        }
+        s_tts_used_us.store(ok ? esp_timer_get_time() : 0);
+        esp_http_client_set_user_data(s_tts_http, nullptr);
+    }
+    if (ok) {
+        ESP_LOGI(TAG, "Azure TTS%s: %u bytes, the first %d ms after the request (%s connection)",
+                 j->warm ? " warm-up" : "", (unsigned)j->got, (int)((j->first_us - j->start_us) / 1000),
+                 reused ? "open" : "new");
+    } else {
+        ESP_LOGW(TAG, "Azure TTS failed (HTTP %d)", status);
+    }
+    if (j->job == s_tts_job.load()) {
+        s_tts_result.store(ok ? 1 : -1);
+    }
+    free(j);
+    s_tts_busy.store(false);
+    vTaskDelete(nullptr);
+}
+
+/* Starts fetching n bytes of text's speech (text NULL: a warm-up). 1 if it
+ * started, 0 if Azure's busy with another, -1 if it can't start. */
+static int tts_start(const char *text, size_t n)
+{
+    if (s_tts_busy.load()) {
+        return 0;
+    }
+    if (!s_tts_mp3) {
+        s_tts_mp3 = xStreamBufferCreateWithCaps(TTS_MP3_STREAM, 1, MALLOC_CAP_SPIRAM);
+    }
+    tts_job_t *j = s_tts_mp3 ? tts_job_new(text, n) : nullptr;
+    if (!j) {
+        return -1;
+    }
+    j->warm = !text;
+    xStreamBufferReset(s_tts_mp3);   /* nothing is blocked on it: no fetch is running */
+    j->job = ++s_tts_job;
+    s_tts_result.store(0);
+    s_tts_busy.store(true);
+    /* The stack can be in PSRAM: the task never writes flash. */
+    if (xTaskCreateWithCaps(tts_task, "muse_tts", 12 * 1024, j, 4, nullptr, MALLOC_CAP_SPIRAM) != pdPASS) {
+        s_tts_busy.store(false);
+        free(j);
+        return -1;
+    }
+    return 1;
+}
+
+/* Sends message i's next piece to Azure, as tts_start() answers; 0 also when
+ * there's none yet. A piece of only spaces is passed over. */
+static int tts_next(int i)
+{
+    msg_t &m = s_turn.msgs[i];
+    const char *text = s_turn.texts + i * TEXT_MAX + m.spoken;
+    size_t n = tts_piece(i), k = 0;
+    while (k < n && isspace((unsigned char)text[k])) {
+        k++;
+    }
+    if (k == n) {
+        m.spoken += n;
+        return 0;
+    }
+    int r = tts_start(text, n);
+    if (r > 0) {
+        m.spoken += n;
+        s_turn.fetching = true;
+        s_turn.piece_in = false;
+    }
+    return r;
+}
+
+/* While Muse thinks: opens the connection, unless one's open, so the reply's speech needn't wait for it. */
+static void tts_warm(void)
+{
+    int64_t used = s_tts_used_us.load();
+    if (tts_azure() && (!used || now_us() - used > TTS_WARM_US)) {
+        tts_start(nullptr, 0);
+    }
+}
+
+/* Azure failed: what's been said plays out and the turn speaks no more. A
+ * message with nothing said yet goes back in line, to be shown unspoken. */
+static void tts_fail(void)
+{
+    s_turn.tts_failed = true;
+    msg_t &m = s_turn.msgs[s_turn.tts_msg];
+    if (!s_turn.mp3_len && s_turn.pcm_out == m.pcm_start) {
+        m.tts = TTS_QUEUED;
+        s_turn.tts_msg = -1;
+        return;
+    }
+    s_turn.mp3_ended = true;
+}
+
+/* Moves fetched MP3 to the decoder, and sends the message's next piece once one's in. */
+static void tts_poll(void)
+{
+    if (s_turn.tts_msg < 0 || s_turn.silent || s_turn.mp3_ended || !s_tts_mp3) {
+        return;
+    }
+    uint8_t buf[1024];
+    size_t n;
+    while (s_turn.mp3_len + sizeof(buf) <= MP3_BUF
+           && (n = xStreamBufferReceive(s_tts_mp3, buf, sizeof(buf), 0)) > 0) {
+        tts_data(buf, n);
+    }
+    if (s_turn.fetching) {
+        int result = s_tts_result.load();
+        if (!result || !xStreamBufferIsEmpty(s_tts_mp3)) {
+            return;
+        }
+        s_turn.fetching = false;
+        if (result < 0) {
+            tts_fail();
+            return;
+        }
+        s_turn.piece_in = true;   /* decode() needn't hold its end back for more */
+    }
+    int i = s_turn.tts_msg, r = tts_next(i);
+    if (r < 0) {
+        tts_fail();
+    } else if (!r && s_turn.msgs[i].done && s_turn.msgs[i].spoken >= strlen(s_turn.texts + i * TEXT_MAX)) {
+        s_turn.mp3_ended = true;   /* all of it's in: decode() drains it, then finishes */
+    }
+}
+#endif
+
 /* Speaker off: queues the shown message's silence while the reply buffer has room. */
 static void pace_silently(void)
 {
@@ -1603,7 +2125,7 @@ static void decode(void)
      * less, it resets and says to skip all of it, which drops speech and clicks.
      * So until the stream ends, leave the last MP3_HOLD bytes for more to arrive.
      */
-    size_t hold = s_turn.mp3_ended ? 0 : MP3_HOLD;
+    size_t hold = s_turn.mp3_ended || s_turn.piece_in ? 0 : MP3_HOLD;
     size_t off = 0;
     while (s_turn.mp3_len - off > hold &&
            xStreamBufferSpacesAvailable(s_out) >= (MINIMP3_MAX_SAMPLES_PER_FRAME / 2 + 8) * sizeof(int16_t)) {
@@ -1989,7 +2511,7 @@ static void hatch_task(void *arg)
         }
         bool sent = true;
         if (s_turn.phase == P_LISTEN) {
-            sent = VOICE_NOTE ? record_note() : pump_mic();
+            sent = !VOICE_NOTE ? pump_mic() : stt_on() ? record_stt() : record_note();
         }
         if (!sent) {
             drop_connection("send failed");
@@ -1997,6 +2519,9 @@ static void hatch_task(void *arg)
         }
         if (s_turn.phase == P_WAIT_REPLY) {
             start_tts();
+#if CONFIG_MUSE_TTS_AZURE
+            tts_poll();
+#endif
             decode();
         }
         if (!s_connected) {

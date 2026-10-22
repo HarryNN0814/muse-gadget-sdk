@@ -153,7 +153,7 @@ static bool next_line(const char **text, int cols, const char **start, size_t *l
 bool muse_hatch_caption_at(const char *text, size_t at, char *out, size_t cap)
 {
     int cols, lines;
-    muse_state_page(muse_text_has_cjk(text), &cols, &lines);
+    muse_state_page(text, &cols, &lines);
     const char *p = text, *start;
     size_t len;
     int line = -1, n = 0;
@@ -181,6 +181,49 @@ bool muse_hatch_caption_at(const char *text, size_t at, char *out, size_t cap)
         o += snprintf(out + o, cap - o, "%s%.*s", o ? "\n" : "", (int)len, start);
     }
     return true;
+}
+
+/*
+ * Drops * and ` anywhere (bold, italics, code) and the marks a line starts
+ * with: a heading's #, a quote's >, a list's bullet and a table's rule. A
+ * table's cells are separated by commas. Numbered lists keep their numbers,
+ * which read as they are.
+ * ponytail: a line that starts with a sign ("-5 độ") loses it too.
+ */
+size_t muse_hatch_plain(char *text, muse_hatch_plain_t *plain)
+{
+    char *o = text;
+    for (const char *p = text; *p; p++) {
+        char c = *p;
+        if (c == '\n') {
+            *plain = (muse_hatch_plain_t){ 0 };   /* a row's closing | adds nothing */
+        } else if (c == '*' || c == '`' || (!plain->mid_line && strchr("#>+-|: \t", c))) {
+            continue;
+        } else if (c == '|') {
+            while (o > text && o[-1] == ' ') {
+                o--;
+            }
+            plain->cell = true;
+            continue;
+        } else if (plain->cell && c == ' ') {
+            continue;
+        } else {
+            plain->mid_line = true;
+            if (plain->cell) {
+                /* ", " in place of the | and its spaces, as much as they left room for */
+                if (o < p) {
+                    *o++ = ',';
+                }
+                if (o < p) {
+                    *o++ = ' ';
+                }
+                plain->cell = false;
+            }
+        }
+        *o++ = c;
+    }
+    *o = '\0';
+    return o - text;
 }
 
 /* ---- Typed turns on the serial console ---- */

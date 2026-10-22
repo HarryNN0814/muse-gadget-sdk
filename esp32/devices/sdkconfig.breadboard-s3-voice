@@ -1,0 +1,51 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ESP32-S3 breadboard voice build: an ESP32-S3-DevKitC-1 style board with an
+# N16R8 module (16 MB quad flash, 8 MB octal PSRAM), its addressable RGB LED on
+# GPIO48 and BOOT button, plus an INMP441 I2S mic and a MAX98357A I2S amp
+# wired as xiaozhi-esp32's bread-compact-wifi board (pins in
+# main/voice_board_breadboard.c). Load last, after sdkconfig.defaults (see
+# README.md in this directory). A display wired to that build is left dark.
+# Source: https://github.com/78/xiaozhi-esp32, main/boards/bread-compact-wifi/
+# config.h, and Espressif's ESP32-S3-DevKitC-1 v1.0 user guide (LED on GPIO48).
+CONFIG_IDF_TARGET="esp32s3"
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_240=y
+
+# The onboard WS2812 shows status and voice; GPIO48 is the default for this
+# backend. v1.1 DevKitC-1 boards have it on GPIO38.
+CONFIG_HOMEHUB_LED_BACKEND_BREADBOARD_VOICE=y
+CONFIG_HOMEHUB_VOICE=y
+CONFIG_HOMEHUB_BLE_NAME_SUFFIX="-voice"
+# BOOT: push-to-talk once Muse is connected, the setup button before.
+CONFIG_HOMEHUB_BUTTON_GPIO=0
+
+# 16 MB quad flash, as on the N16R8 module.
+CONFIG_ESPTOOLPY_FLASHMODE_QIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+
+# Octal PSRAM holds the TLS buffers, the voice task and the reply buffer.
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_MODE_OCT=y
+CONFIG_SPIRAM_MODE_QUAD=n
+CONFIG_SPIRAM_SPEED_80M=y
+
+# The S3's own USB-Serial-JTAG for the console, the "USB" port on these boards.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+
+# The BLE controller already takes ~70 KB of internal RAM on the S3; keep the
+# NimBLE host's allocations in PSRAM so pairing has room.
+CONFIG_BT_NIMBLE_MEM_ALLOC_MODE_EXTERNAL=y
