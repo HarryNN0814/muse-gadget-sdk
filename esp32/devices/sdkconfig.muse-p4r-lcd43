@@ -34,6 +34,8 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_IGNORE_NOTFOUND=n
 CONFIG_LV_COLOR_DEPTH=16
+# Both cores draw: the frame is rendered in parts by two threads.
+CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
 # Wi-Fi and BLE run on the C6 through ESP-Hosted over 4-bit SDIO (slot 1,
 # GPIO14-19); GPIO54 drives the C6's reset.
 CONFIG_SLAVE_IDF_TARGET_ESP32C6=y

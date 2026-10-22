@@ -32,7 +32,7 @@
  * - Touch is polled: INT (GPIO31) isn't used.
  *
  * The panel's coordinates are portrait; LVGL draws 800x480 and the adapter
- * rotates it, so the touch points are turned to match in touch_read().
+ * rotates it, which turns the touch points too.
  */
 #include <math.h>
 
@@ -50,7 +50,7 @@
 #include "esp_lcd_panel_ops.h"
 #include "esp_lcd_touch.h"
 #include "esp_log.h"
-#include "esp_lv_adapter.h"
+#include "esp_lvgl_port.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -66,6 +66,7 @@ static const char *TAG = "board";
 #define PANEL_H 800
 #define LCD_RST GPIO_NUM_33
 #define BL_EN GPIO_NUM_34      /* boost enable, active high; PWM dims it */
+#define STRIP_ROWS 32          /* LVGL draws in strips of 800 x this many pixels, in internal RAM (three: one to rotate in) */
 #define MIPI_PHY_LDO_CHAN 3
 #define MIPI_PHY_LDO_MV 2500
 
@@ -206,9 +207,7 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *io_out)
     esp_lcd_dbi_io_config_t dbi_cfg = ST7102_MIPI_PANEL_IO_DBI_CONFIG();
     ESP_RETURN_ON_ERROR(esp_lcd_new_panel_io_dbi(bus, &dbi_cfg, io_out), TAG, "dbi io");
 
-    /* The adapter draws into the panel's own frame buffers: three, to avoid tearing. */
     esp_lcd_dpi_panel_config_t dpi = ST7102_MIPI_480_800_PANEL_60HZ_DPI_CONFIG(LCD_COLOR_FMT_RGB565);
-    dpi.num_fbs = 3;
     st7102_vendor_config_t vendor = {
         .init_cmds = s_lcd_init,
         .init_cmds_size = sizeof(s_lcd_init) / sizeof(s_lcd_init[0]),
@@ -226,47 +225,61 @@ static esp_err_t panel_init(esp_lcd_panel_io_handle_t *io_out)
     ESP_RETURN_ON_ERROR(esp_lcd_panel_reset(s_panel), TAG, "panel reset");
     vTaskDelay(pdMS_TO_TICKS(20));
     ESP_RETURN_ON_ERROR(esp_lcd_panel_init(s_panel), TAG, "panel init");
+    ESP_RETURN_ON_ERROR(esp_lcd_dpi_panel_enable_dma2d(s_panel), TAG, "dma2d");   /* frames are copied by hardware */
     return esp_lcd_panel_disp_on_off(s_panel, true);
 }
 
-/* Raw ST7123 points are portrait (x 0..479, y 0..799); the screen is that turned 270 degrees. */
+/* The raw ST7123 points are the panel's own (portrait); LVGL turns them with the display's rotation. */
 static void touch_read(lv_indev_t *indev, lv_indev_data_t *data)
 {
     (void)indev;
     uint16_t x = 0, y = 0;
     uint8_t n = 0;
-    static bool down;   /* bring-up: the first point of each touch */
     if (!s_touch || esp_lcd_touch_read_data(s_touch) != ESP_OK
         || !esp_lcd_touch_get_coordinates(s_touch, &x, &y, NULL, &n, 1) || !n) {
         data->state = LV_INDEV_STATE_RELEASED;
-        down = false;
         return;
     }
-    data->point.x = PANEL_H - 1 - y;
-    data->point.y = x;
+    data->point.x = x;
+    data->point.y = y;
     data->state = LV_INDEV_STATE_PRESSED;
-    if (!down) {
-        ESP_LOGI(TAG, "touch raw %u,%u -> screen %d,%d", x, y, (int)data->point.x, (int)data->point.y);
-    }
-    down = true;
 }
 
 static lv_display_t *display_start(lv_indev_t **touch)
 {
-    esp_lv_adapter_config_t cfg = ESP_LV_ADAPTER_DEFAULT_CONFIG();
-    cfg.task_core_id = MUSE_UI_CORE;
+    lvgl_port_cfg_t cfg = ESP_LVGL_PORT_INIT_CONFIG();
     cfg.task_priority = MUSE_UI_PRIORITY;
-    cfg.task_stack_size = 16 * 1024;
+    cfg.task_affinity = MUSE_UI_CORE;
+    cfg.task_stack = 16 * 1024;
     esp_lcd_panel_io_handle_t io = NULL;
-    if (esp_lv_adapter_init(&cfg) != ESP_OK || backlight_init() != ESP_OK || panel_init(&io) != ESP_OK) {
+    if (lvgl_port_init(&cfg) != ESP_OK || backlight_init() != ESP_OK || panel_init(&io) != ESP_OK) {
         return NULL;
     }
-    const esp_lv_adapter_display_config_t dc = ESP_LV_ADAPTER_DISPLAY_MIPI_DEFAULT_CONFIG(
-        s_panel, io, PANEL_W, PANEL_H, ESP_LV_ADAPTER_ROTATE_270);
-    lv_display_t *disp = esp_lv_adapter_register_display(&dc);
+
+    /*
+     * Two full-size buffers in PSRAM, redrawn in parts and rotated by LVGL
+     * into the panel's one frame buffer. Tearing avoidance, full refresh and
+     * PPA each tore the picture on this board.
+     */
+    const lvgl_port_display_cfg_t dc = {
+        .io_handle = io,
+        .panel_handle = s_panel,
+        .buffer_size = PANEL_H * STRIP_ROWS,
+        .double_buffer = true,
+        .hres = PANEL_W,
+        .vres = PANEL_H,
+        .monochrome = false,
+        .color_format = LV_COLOR_FORMAT_RGB565,
+        .rotation = { .swap_xy = false, .mirror_x = false, .mirror_y = false },
+        .flags = { .buff_dma = true, .buff_spiram = false, .sw_rotate = 1 },
+    };
+    const lvgl_port_display_dsi_cfg_t dsi = { .flags = { .avoid_tearing = false } };
+    lv_display_t *disp = lvgl_port_add_disp_dsi(&dc, &dsi);
     if (!disp) {
         return NULL;
     }
+    lvgl_port_lock(0);
+    lv_display_set_rotation(disp, LV_DISPLAY_ROTATION_270);
 
     /* Touch is optional: a missing panel mustn't stop the board booting. */
     esp_lcd_panel_io_handle_t tp_io = NULL;
@@ -287,12 +300,18 @@ static lv_display_t *display_start(lv_indev_t **touch)
     } else {
         ESP_LOGW(TAG, "touch controller not found: running without touch");
     }
-    return esp_lv_adapter_start() == ESP_OK ? disp : NULL;
+    lvgl_port_unlock();
+    return disp;
 }
 
 static bool display_lock(int timeout_ms)
 {
-    return esp_lv_adapter_lock(timeout_ms) == ESP_OK;
+    return lvgl_port_lock(timeout_ms < 0 ? 0 : (uint32_t)timeout_ms);   /* 0 waits forever */
+}
+
+static void display_unlock(void)
+{
+    lvgl_port_unlock();
 }
 
 static void set_brightness(int pct)
@@ -566,7 +585,7 @@ static const muse_board_t s_board = {
     .init = init,
     .display_start = display_start,
     .display_lock = display_lock,
-    .display_unlock = esp_lv_adapter_unlock,
+    .display_unlock = display_unlock,
     .set_brightness = set_brightness,
     .panel_sleep = panel_sleep,
     .audio_init = audio_init,
