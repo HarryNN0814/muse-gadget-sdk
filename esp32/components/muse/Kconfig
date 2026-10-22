@@ -120,6 +120,9 @@ menu "Muse"
         config MUSE_BOARD_WAVESHARE_P4_LCD35
             bool "Waveshare ESP32-P4-WIFI6-Touch-LCD-3.5 (ESP32-P4 + C6)"
             depends on IDF_TARGET_ESP32P4
+        config MUSE_BOARD_P4R_LCD43
+            bool "P4_R 4.3\" (ESP32-P4 + C6, 800x480 MIPI-DSI, ES8388, PDM mics)"
+            depends on IDF_TARGET_ESP32P4
     endchoice
 
     config MUSE_ENABLED
@@ -155,6 +158,7 @@ menu "Muse"
         default "vn_s3_183" if MUSE_BOARD_VN_S3_183
         default "ai_passport" if MUSE_BOARD_AI_PASSPORT
         default "waveshare_p4_lcd35" if MUSE_BOARD_WAVESHARE_P4_LCD35
+        default "p4r_lcd43" if MUSE_BOARD_P4R_LCD43
         default "none"
 
     config MUSE_STICKY_SD

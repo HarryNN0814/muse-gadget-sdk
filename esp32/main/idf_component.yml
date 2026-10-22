@@ -20,10 +20,13 @@ dependencies:
     version: ">=5.1"
   # The Waveshare P4 3.5's Wi-Fi and BLE are on its ESP32-C6, over SDIO.
   espressif/esp_hosted:
-    version: "~2.12.13"
-    rules:
+    matches:
       - if: '$CONFIG{MUSE_BOARD_ID} == "waveshare_p4_lcd35"'
+        version: "~2.12.13"
+      # The P4_R's C6 runs slave 2.12.12; host and slave must be the same version.
+      - if: '$CONFIG{MUSE_BOARD_ID} == "p4r_lcd43"'
+        version: "2.12.12"
   espressif/esp_wifi_remote:
     version: "~1.4.2"
     rules:
-      - if: '$CONFIG{MUSE_BOARD_ID} == "waveshare_p4_lcd35"'
+      - if: '$CONFIG{MUSE_BOARD_ID} in ["waveshare_p4_lcd35", "p4r_lcd43"]'

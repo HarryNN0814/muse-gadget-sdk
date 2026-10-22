@@ -114,6 +114,11 @@ if(CONFIG_MUSE_ENABLED)
         list(APPEND srcs "boards/board_ai_passport.c")
     elseif(CONFIG_MUSE_BOARD_WAVESHARE_P4_LCD35)
         list(APPEND srcs "boards/board_waveshare_p4_lcd35.c")
+    elseif(CONFIG_MUSE_BOARD_P4R_LCD43)
+        # The panel and touch drivers are Espressif's, kept here (boards/p4r/README.md).
+        list(APPEND srcs "boards/board_p4r_lcd43.c"
+            "boards/p4r/esp_lcd_st7102.c" "boards/p4r/esp_lcd_st7102_general.c"
+            "boards/p4r/esp_lcd_st7102_mipi.c" "boards/p4r/esp_lcd_touch_st7123.c")
     endif()
     if(CONFIG_MUSE_VIDEO)
         # Phone camera: decode and draw (muse_video), and the transports that feed it.

@@ -1,0 +1,52 @@
+# Copyright (c) Meta Platforms, Inc. and affiliates.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# P4_R 4.3": ESP32-P4 silicon v1.x, 16 MB flash, 32 MB hex PSRAM, a 480x800
+# ST7102 MIPI-DSI panel, ST7123 touch, ES8388, two PDM mics, an ESP32-C6 for
+# Wi-Fi and BLE over SDIO. Native USB Serial/JTAG (303a:1001).
+# Pins, timing and traps come from the board's own firmware; see
+# components/muse/boards/board_p4r_lcd43.c.
+# Load last, after sdkconfig.defaults and sdkconfig.muse.
+CONFIG_IDF_TARGET="esp32p4"
+CONFIG_MUSE_BOARD_P4R_LCD43=y
+CONFIG_ESPTOOLPY_FLASHSIZE_16MB=y
+CONFIG_ESPTOOLPY_FLASHSIZE="16MB"
+CONFIG_ESPTOOLPY_FLASHMODE_DIO=y
+CONFIG_ESPTOOLPY_FLASHFREQ_80M=y
+# BOOT; the full UI ignores it (no physical buttons are used).
+CONFIG_HOMEHUB_BUTTON_GPIO=35
+# Silicon v1.x: a v3 image doesn't boot on it, and these chips top out at 360 MHz.
+CONFIG_ESP32P4_SELECTS_REV_LESS_V3=y
+CONFIG_ESP32P4_REV_MIN_100=y
+CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
+CONFIG_SPIRAM=y
+CONFIG_SPIRAM_SPEED_80M=y
+CONFIG_SPIRAM_IGNORE_NOTFOUND=n
+CONFIG_LV_COLOR_DEPTH=16
+# Wi-Fi and BLE run on the C6 through ESP-Hosted over 4-bit SDIO (slot 1,
+# GPIO14-19); GPIO54 drives the C6's reset.
+CONFIG_SLAVE_IDF_TARGET_ESP32C6=y
+CONFIG_ESP_HOSTED_CP_TARGET_ESP32C6=y
+CONFIG_ESP_HOSTED_P4_DEV_BOARD_FUNC_BOARD=y
+CONFIG_ESP_HOSTED_SDIO_HOST_INTERFACE=y
+CONFIG_ESP_HOSTED_SDIO_SLOT_1=y
+CONFIG_ESP_HOSTED_SDIO_4_BIT_BUS=y
+CONFIG_ESP_HOSTED_SDIO_GPIO_RESET_SLAVE=54
+CONFIG_ESP_HOSTED_MEMPOOL_PREFER_SPIRAM=y
+CONFIG_ESP_HOSTED_DFLT_TASK_FROM_SPIRAM=y
+# NimBLE on the P4 talks to the C6's controller over ESP-Hosted's virtual HCI.
+CONFIG_BT_CONTROLLER_DISABLED=y
+CONFIG_BT_NIMBLE_TRANSPORT_UART=n
+CONFIG_ESP_HOSTED_ENABLE_BT_NIMBLE=y
+CONFIG_ESP_HOSTED_NIMBLE_HCI_VHCI=y
