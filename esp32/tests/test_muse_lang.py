@@ -54,6 +54,7 @@ class LangTest(unittest.TestCase):
             for p in sorted(MUSE.glob("*.c*"))
             if p.name != "muse_lang.c"
         )
+        code = re.sub(r'"\s*\n\s*"', "", code)   # a long text split over lines is one literal
         literals = {s.replace('\\"', '"') for s in re.findall(r'"((?:[^"\\\n]|\\.)*)"', code)}
         for name, entries in self.tables.items():
             for en, _ in entries:
@@ -81,11 +82,22 @@ class LangTest(unittest.TestCase):
                 self.assertEqual(missing, [], f"{name}: {text!r}")
         # The menu is in Montserrat too: ASCII built in, the rest from its
         # Vietnamese letters at each size.
-        for px in (12, 14, 20, 28):
+        for px in (12, 14, 16, 20, 28):
             has = glyphs(f"muse_font_vi_{px}.c")
             for en, text in self.tables["MENU"]:
                 missing = sorted({c for c in text if ord(c) > 0x7E and ord(c) not in has})
                 self.assertEqual(missing, [], f"{px} px: {text!r}")
+
+    def test_text_keeps_the_letters_the_fonts_have(self) -> None:
+        # muse_text.c's vi_letter() is the set muse_font_vi_<px>.c holds.
+        source = (MUSE / "muse_text.c").read_text(encoding="utf-8")
+        body = source[source.index("static bool vi_letter"):]
+        body = body[: body.index("\n}\n")]
+        kept: set[int] = set()
+        for lo, hi, one in re.findall(r"\(cp >= (0x[0-9A-F]+) && cp <= (0x[0-9A-F]+)\)|cp == (0x[0-9A-F]+)", body):
+            kept.update(range(int(lo, 16), int(hi, 16) + 1) if lo else [int(one, 16)])
+        font = (MUSE / "fonts" / "muse_font_vi_16.c").read_text(encoding="utf-8")
+        self.assertEqual(kept, {int(cp, 16) for cp in re.findall(r"/\* U\+([0-9A-F]+) ", font)})
 
 
 if __name__ == "__main__":

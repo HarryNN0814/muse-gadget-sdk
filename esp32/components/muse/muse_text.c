@@ -139,6 +139,7 @@ static const char VIETNAMESE[] =
     "UuUuUuUuUuUuUuYyYyYyYy";
 
 static bool s_keep_latin;   /* muse_text_keep_latin() */
+static bool s_keep_vi;      /* muse_text_keep_vietnamese() */
 
 /* The code point at s, and its length in *len; -1 if it's broken. */
 static int32_t decode(const unsigned char *s, size_t *len)
@@ -256,6 +257,22 @@ void muse_text_keep_latin(void)
     s_keep_latin = true;
 }
 
+/* The letters of fonts/muse_font_vi_<px>.c, Montserrat's fallback (VI in tools/muse/gen_cjk_font.sh). */
+static bool vi_letter(int32_t cp)
+{
+    return (cp >= 0xC0 && cp <= 0xC3) || (cp >= 0xC8 && cp <= 0xCA) || cp == 0xCC || cp == 0xCD ||
+           (cp >= 0xD2 && cp <= 0xD5) || cp == 0xD9 || cp == 0xDA || cp == 0xDD || (cp >= 0xE0 && cp <= 0xE3) ||
+           (cp >= 0xE8 && cp <= 0xEA) || cp == 0xEC || cp == 0xED || (cp >= 0xF2 && cp <= 0xF5) || cp == 0xF9 ||
+           cp == 0xFA || cp == 0xFD || cp == 0x102 || cp == 0x103 || cp == 0x110 || cp == 0x111 || cp == 0x128 ||
+           cp == 0x129 || cp == 0x168 || cp == 0x169 || cp == 0x1A0 || cp == 0x1A1 || cp == 0x1AF || cp == 0x1B0 ||
+           (cp >= 0x1EA0 && cp <= 0x1EF9);
+}
+
+void muse_text_keep_vietnamese(void)
+{
+    s_keep_vi = true;
+}
+
 bool muse_text_has_latin(const char *s)
 {
     while (s_keep_latin && *s) {
@@ -268,14 +285,14 @@ bool muse_text_has_latin(const char *s)
     return false;
 }
 
-static void fold(char *s, size_t cap, bool keep_latin)
+/* keep: which letters stay, or NULL for none. */
+static void fold(char *s, size_t cap, bool (*keep)(int32_t))
 {
     size_t n = strlen(s);
     for (char *p = s; *p;) {
         size_t len;
         char a[4];
-        int alen = keep_latin && latin_letter(decode((const unsigned char *)p, &len)) ? -1
-                                                                                     : muse_text_ascii(p, &len, a);
+        int alen = keep && keep(decode((const unsigned char *)p, &len)) ? -1 : muse_text_ascii(p, &len, a);
         if (alen < 0) {
             p += len;
             continue;
@@ -293,12 +310,12 @@ static void fold(char *s, size_t cap, bool keep_latin)
 
 void muse_text_to_ascii(char *s, size_t cap)
 {
-    fold(s, cap, false);
+    fold(s, cap, NULL);
 }
 
 void muse_text_to_caption(char *s, size_t cap)
 {
-    fold(s, cap, s_keep_latin);
+    fold(s, cap, s_keep_latin ? latin_letter : NULL);
 }
 
 const char *muse_text_showable(const char *text, char *buf, size_t cap)
@@ -310,6 +327,6 @@ const char *muse_text_showable(const char *text, char *buf, size_t cap)
     if (!*p || strlcpy(buf, text, cap) >= cap) {
         return text;
     }
-    muse_text_to_ascii(buf, cap);
+    fold(buf, cap, s_keep_vi ? vi_letter : NULL);
     return buf;
 }

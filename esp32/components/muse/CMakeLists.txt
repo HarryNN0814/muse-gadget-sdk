@@ -57,8 +57,9 @@ if(CONFIG_MUSE_ENABLED)
         list(APPEND srcs "fonts/muse_font_latin_16.c")   # captions with accented letters
     endif()
     if(CONFIG_MUSE_UI_LANG_VI)
-        # Montserrat's Vietnamese letters, for the menu and the pairing card
+        # Montserrat's Vietnamese letters, for the menu, the pairing card and the settings
         list(APPEND srcs "fonts/muse_font_vi_12.c" "fonts/muse_font_vi_14.c"
+                         "fonts/muse_font_vi_16.c"
                          "fonts/muse_font_vi_20.c" "fonts/muse_font_vi_28.c")
     endif()
     # Your own character (tools/muse/AVATAR_RECIPE.md) stands in for the default

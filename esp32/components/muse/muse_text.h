@@ -58,13 +58,18 @@ void muse_text_to_ascii(char *s, size_t cap);
  * now on muse_text_to_caption() keeps them and muse_text_has_latin() sees them. */
 void muse_text_keep_latin(void);
 
+/* The text drawn in Montserrat has its fallback of Vietnamese letters
+ * (CONFIG_MUSE_UI_LANG_VI): from now on muse_text_showable() keeps them. */
+void muse_text_keep_vietnamese(void);
+
 /* muse_text_to_ascii() for a caption, which may keep accented letters. */
 void muse_text_to_caption(char *s, size_t cap);
 
 /* Whether s has accented letters a caption keeps. */
 bool muse_text_has_latin(const char *s);
 
-/* text, or if it needs stand-ins and fits in cap bytes, a copy with them in buf. */
+/* text, or if it needs stand-ins and fits in cap bytes, a copy with them in buf
+ * (the Vietnamese letters stay after muse_text_keep_vietnamese()). */
 const char *muse_text_showable(const char *text, char *buf, size_t cap);
 
 #ifdef __cplusplus

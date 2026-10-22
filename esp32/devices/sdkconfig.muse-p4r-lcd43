@@ -33,6 +33,11 @@ CONFIG_ESP_DEFAULT_CPU_FREQ_MHZ_360=y
 CONFIG_SPIRAM=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_IGNORE_NOTFOUND=n
+# Vietnamese captions keep their tones (fonts/muse_font_latin_16.c), and the
+# screen's own text, settings pages included, is in Vietnamese too
+# (components/muse/muse_lang.c).
+CONFIG_MUSE_LATIN_FONT=y
+CONFIG_MUSE_UI_LANG_VI=y
 CONFIG_LV_COLOR_DEPTH=16
 # Both cores draw: the frame is rendered in parts by two threads.
 CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
