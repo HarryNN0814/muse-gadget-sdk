@@ -641,6 +641,10 @@ static void boot_task(void *arg) {
 }
 
 void muse_glue_start(void) {
+    const muse_board_t *board = muse_board_get();
+    if (board->early_init) {
+        board->early_init();
+    }
     // First, before Link's Wi-Fi, BLE and tunnel and Muse's display take and
     // fragment internal RAM: the CPU's light-sleep retention memory.
     muse_input_power_init();

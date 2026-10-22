@@ -92,6 +92,10 @@ typedef struct {
     int frame_ms;           /* face animation period */
     int avatar_px;          /* optional avatar canvas size; 0 uses the UI default */
 
+    /* The first thing at start, before Wi-Fi and the display: safeguards for
+     * the chip itself. NULL for none. */
+    void (*early_init)(void);
+
     /* Power rails, buses, expanders. Runs first. */
     esp_err_t (*init)(void);
 

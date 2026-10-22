@@ -44,6 +44,7 @@
 #include "esp_check.h"
 #include "esp_codec_dev.h"
 #include "esp_codec_dev_defaults.h"
+#include "esp_attr.h"
 #include "esp_ldo_regulator.h"
 #include "esp_lcd_mipi_dsi.h"
 #include "esp_lcd_panel_io.h"
@@ -51,6 +52,9 @@
 #include "esp_lcd_touch.h"
 #include "esp_log.h"
 #include "esp_lvgl_port.h"
+#include "esp_sleep.h"
+#include "esp_system.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -152,6 +156,46 @@ static void quiet_audio_pins(void)
         gpio_set_level(pins[i], 0);
     }
     vTaskDelay(pdMS_TO_TICKS(20));
+}
+
+/*
+ * The C6 can hang after a soft restart, which pairing and a new SDK token
+ * both do: ESP-Hosted gets "Card init success", then read errors, gives up
+ * after ~14 s and restarts the P4, for ever. A reset through GPIO54, a longer
+ * pulse or a slower bus don't rescue it; only cutting power does. So, as the
+ * board's stock firmware does: when this many boots in a row haven't lasted
+ * HEALTHY_S, deep-sleep a few seconds, which drops the P4's pins and HP
+ * domain, and boot as new (~20 s in all).
+ */
+#define HANG_BOOTS 2
+#define HEALTHY_S 20
+#define BOOTS_MAGIC 0xC6C6C6C6u
+
+static RTC_NOINIT_ATTR uint32_t s_short_boots, s_short_boots_magic;
+
+static void healthy_boot(void *arg)
+{
+    (void)arg;
+    s_short_boots = 0;
+}
+
+static void early_init(void)
+{
+    esp_reset_reason_t why = esp_reset_reason();
+    if (s_short_boots_magic != BOOTS_MAGIC || why == ESP_RST_POWERON || why == ESP_RST_DEEPSLEEP) {
+        s_short_boots = 0;
+    }
+    s_short_boots_magic = BOOTS_MAGIC;
+    if (++s_short_boots >= HANG_BOOTS) {
+        ESP_LOGW(TAG, "%u short boots in a row: the C6 may be hung, deep sleep to cut its link", (unsigned)s_short_boots);
+        s_short_boots = 0;
+        esp_deep_sleep(5 * 1000000);
+    }
+    static esp_timer_handle_t timer;
+    const esp_timer_create_args_t args = { .callback = healthy_boot, .name = "healthy_boot" };
+    if (esp_timer_create(&args, &timer) == ESP_OK) {
+        esp_timer_start_once(timer, HEALTHY_S * 1000000LL);
+    }
 }
 
 static esp_err_t init(void)
@@ -582,6 +626,7 @@ static const muse_board_t s_board = {
     .talk_button = "screen microphone",
     .talk_hint = { LV_ALIGN_RIGHT_MID, -24, 0 },
     .frame_ms = 40,
+    .early_init = early_init,
     .init = init,
     .display_start = display_start,
     .display_lock = display_lock,
