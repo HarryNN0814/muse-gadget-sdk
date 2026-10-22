@@ -82,7 +82,7 @@ BOARDS = {
     "XIAO 4-inch AIO": "aio4",
     "FoloToy AI Passport": "ai-passport",
     "Waveshare ESP32-P4 3.5": "p4lcd35",
-    "P4_R 4.3-inch": "p4r",
+    "BoardP4C6_VN": "p4r",
 }
 CHAT_BOARDS = ("s3", "s3n", "s3-216", "185c", "aipi", "box3", "sticks3", "watcher", "stopwatch", "cores3", "core2", "fnk0104b", "jc3248w535", "lcd7", "lcd128", "vn183", "echoear", "p4lcd35", "p4r", "aio4")
 

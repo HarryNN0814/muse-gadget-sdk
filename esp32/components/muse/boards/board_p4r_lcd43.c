@@ -616,7 +616,7 @@ static unsigned poll_buttons(void)
 }
 
 static const muse_board_t s_board = {
-    .name = "P4_R 4.3-inch",
+    .name = "BoardP4C6_VN",
     .width = PANEL_H,
     .height = PANEL_W,
     .round = false,
