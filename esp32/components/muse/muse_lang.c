@@ -66,6 +66,7 @@ static const muse_lang_entry_t MESSAGES[] = {
     { "SENDING VOICE NOTE", "Đang gửi tin nhắn thoại" },
     { "NOTE SENT - WAITING FOR MUSE", "Đã gửi, đang chờ Muse" },
     { "MUSE HAS AN ANSWER", "Muse đã có kết quả" },
+    { "TALK, OR TAP TO STOP", "Nói đi, hoặc chạm để dừng" },
     { "Muse is working on it. I'll tell you when it's done.", "Muse đang xử lý. Xong tôi sẽ báo bạn." },
     { "HOLD LONGER TO TALK", "Giữ nút lâu hơn để nói" },
     { "SET UP MUSE FIRST", "Hãy cài đặt Muse trước" },

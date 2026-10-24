@@ -31,6 +31,14 @@ build-muse-p4r-lcd43 menuconfig`, under "ESP32 Device SDK"). The key ships insid
 The overlay builds for P4 silicon **v1.x** (`CONFIG_ESP32P4_SELECTS_REV_LESS_V3`, 360 MHz). A v3 image does
 not boot on it.
 
+## Conversation
+
+A tap on the microphone icon (under half a second) starts a conversation: the mic stays on, a turn starts when
+you speak and ends after a second of quiet, and when Muse has said its reply the mic listens again. Eight
+seconds without speech, or another tap, ends it; a tap while Muse is talking cuts it off and ends it too. A
+longer press is push-to-talk as before. Speech is found by its level against the room's noise, so a noisy room
+can hold a turn open until the 15 s limit. The caption shows "Nói đi, hoặc chạm để dừng" while it listens.
+
 ## Slow answers
 
 When Muse is still working 20 s after it took a request (a long answer, a document), the board says so

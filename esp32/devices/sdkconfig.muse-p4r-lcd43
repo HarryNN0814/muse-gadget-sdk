@@ -38,6 +38,8 @@ CONFIG_SPIRAM_IGNORE_NOTFOUND=n
 # (components/muse/muse_lang.c).
 CONFIG_MUSE_LATIN_FONT=y
 CONFIG_MUSE_UI_LANG_VI=y
+# Tap once, then talk back and forth (components/muse/muse_voice.c).
+CONFIG_MUSE_CONVERSATION=y
 CONFIG_LV_COLOR_DEPTH=16
 # Both cores draw: the frame is rendered in parts by two threads.
 CONFIG_LV_DRAW_SW_DRAW_UNIT_CNT=2
