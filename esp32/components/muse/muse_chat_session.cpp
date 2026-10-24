@@ -70,6 +70,7 @@ extern "C" {
 #include "cJSON.h"
 #include "minimp3.h"
 #include "muse_account_api.h"
+#include "muse_lang.h"
 #include "muse_link.h"
 #include "muse_settings.h"
 #include "muse_wifi.h"
@@ -127,6 +128,8 @@ static_assert(MP3_BUF > MP3_POLL_ROOM + MP3_HOLD, "reads would stall with the MP
 #define TEXT_REPLY_TIMEOUT_US (5 * 60 * 1000000LL)   /* typed turns: agents can work a while */
 #define TEXT_TURN_CAP_US (15 * 60 * 1000000LL)
 #define TEXT_BUSY_HOLD_US (5 * 60 * 1000000LL)
+#define DETACH_US (20 * 1000000LL)         /* acked, still no reply: say so, and free the device */
+#define PENDING_US (30 * 60 * 1000000LL)   /* how long a detached request's reply is waited for */
 /*
  * The VM's streaming dictation has no ASR behind it right now, so each press
  * goes to the chat as a voice note, the way the phone app sends them, and the
@@ -263,7 +266,22 @@ struct turn_t {
     bool fetching;           /* a piece of the message's speech is on its way */
     bool piece_in;           /* the last piece has all arrived; the next isn't asked for yet */
     bool tts_failed;         /* Azure failed this turn: the rest is shown unspoken */
+    bool detached;           /* the reply is slow: a notice is said, the turn ends, the reply starts another */
+    bool incoming;           /* started by a reply to a request that outlived its turn */
 };
+
+/*
+ * A request Muse was still working on when its turn ended (turn_detach): its
+ * reply, when it comes, is known by the ids the ack gave, and starts a turn
+ * of its own that nobody is listening for (incoming_begin).
+ */
+struct pending_t {
+    bool active;
+    char ids[2][80];
+    int64_t since_us;        /* the last sign of it */
+};
+static pending_t s_pending;
+static std::atomic<bool> s_incoming{false};   /* such a reply has started a turn: muse_hatch_incoming() */
 
 /* 10 KB, most of it the MP3 decoder: in PSRAM on boards that let static data go
  * there (the AIPI), so Wi-Fi setup and TLS have the internal RAM. */
@@ -1494,6 +1512,12 @@ static bool is_user_id(const char *id)
     return id && id[0] && (!strcmp(id, s_turn.user_ids[0]) || !strcmp(id, s_turn.user_ids[1]));
 }
 
+static const char *parent_id(cJSON *payload)
+{
+    const char *parent = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "reply_to_message_id"));
+    return parent ? parent : cJSON_GetStringValue(cJSON_GetObjectItem(payload, "parent_message_id"));
+}
+
 /* The message `id` if it belongs to this turn, binding it on first sight; else -1. */
 static int bind_msg(const char *id, cJSON *payload)
 {
@@ -1504,10 +1528,7 @@ static int bind_msg(const char *id, cJSON *payload)
     if (i >= 0 || s_turn.phase != P_WAIT_REPLY) {
         return i;
     }
-    const char *parent = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "reply_to_message_id"));
-    if (!parent) {
-        parent = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "parent_message_id"));
-    }
+    const char *parent = parent_id(payload);
     /* Once the ack names our message, replies to anything else are someone else's. */
     if (parent && parent[0] && s_turn.acked && !is_user_id(parent) && find_msg(parent) < 0) {
         muse_chat_reject(&s_turn.rejected, id);
@@ -1609,6 +1630,55 @@ static void message_done(int i, char *final_text)
     ESP_LOGI(TAG, "message %s done (%u chars)", m.id, (unsigned)m.len);
 }
 
+/* A piece of message i's text: shown, and sent for speech once a sentence is in. */
+static void add_reply_text(int i, char *text)
+{
+    msg_t &m = s_turn.msgs[i];
+    mark(M_TEXT);
+    append_text(m, text);
+    show_reply_start(m);   /* ignored once the speech starts */
+#if CONFIG_MUSE_TTS_AZURE
+    if (m.tts == TTS_NONE && tts_azure() && tts_piece(i)) {
+        m.tts = TTS_QUEUED;   /* a sentence is in: say it while the rest comes */
+    }
+#endif
+}
+
+static bool pending_owns(const char *id)
+{
+    return id && id[0] && (!strcmp(id, s_pending.ids[0]) || !strcmp(id, s_pending.ids[1]));
+}
+
+/*
+ * A message of the remembered request, with no turn running: starts a turn of
+ * its own for the voice task to play (muse_hatch_incoming). False if it isn't one.
+ */
+static bool incoming_begin(const char *event, cJSON *payload)
+{
+    bool start = !strcmp(event, "delta.message_start") || !strcmp(event, "message.assistant");
+    if (!start && strcmp(event, "delta.text_append") && strcmp(event, "delta.message_done")) {
+        return false;
+    }
+    const char *parent = parent_id(payload);
+    if (!pending_owns(parent)) {
+        if (start) {
+            ESP_LOGI(TAG, "pending reply: %s is not for it (parent %s)", event, parent ? parent : "none");
+        }
+        return false;
+    }
+    if (!turn_start(++s_gen, false)) {
+        return false;
+    }
+    memcpy(s_turn.user_ids, s_pending.ids, sizeof(s_turn.user_ids));
+    s_turn.phase = P_WAIT_REPLY;
+    s_turn.chat_posted = s_turn.acked = s_turn.incoming = true;
+    s_turn.chat_us = s_turn.last_event_us = s_turn.last_content_us = now_us();
+    s_pending.since_us = s_turn.chat_us;
+    ESP_LOGI(TAG, "the reply to a request that outlived its turn has come: announcing it");
+    s_incoming = true;
+    return true;
+}
+
 static const char *msg_id(cJSON *payload, cJSON *event)
 {
     const char *id = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "message_id"));
@@ -1634,11 +1704,13 @@ static void on_event(cJSON *line)
         }
         s_last_seq = v > s_last_seq ? v : s_last_seq;
     }
-    if (s_turn.phase != P_WAIT_REPLY) {
-        return;
-    }
     const char *event = cJSON_GetStringValue(cJSON_GetObjectItem(line, "event")) ?: "";
     cJSON *payload = cJSON_GetObjectItem(line, "payload");
+    if (s_turn.phase == P_IDLE && s_pending.active && incoming_begin(event, payload)) {
+        /* the message below is the turn's first */
+    } else if (s_turn.phase != P_WAIT_REPLY) {
+        return;
+    }
 
     if (!strcmp(event, "agent.status") || !strcmp(event, "task.status")) {
         const char *code = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "activity_code"));
@@ -1676,14 +1748,7 @@ static void on_event(cJSON *line)
             m.len += strlen(text);
             muse_hatch_console("text", text, "\"msg\":%d", i);
         } else if (text && text[0]) {
-            mark(M_TEXT);
-            append_text(m, text);
-            show_reply_start(m);   /* ignored once the speech starts */
-#if CONFIG_MUSE_TTS_AZURE
-            if (m.tts == TTS_NONE && tts_azure() && tts_piece(i)) {
-                m.tts = TTS_QUEUED;   /* a sentence is in: say it while the rest comes */
-            }
-#endif
+            add_reply_text(i, text);
         }
     } else if (done || full) {
         char *text = cJSON_GetStringValue(cJSON_GetObjectItem(payload, "display_text"));
@@ -2176,6 +2241,36 @@ static void decode(void)
     }
 }
 
+/*
+ * The reply is slow (a long answer, a document): rather than wait on it, say
+ * so as a message of the turn, which ends once that's said, and remember the
+ * request. If the reply comes first, it follows the notice as usual.
+ */
+static void turn_detach(void)
+{
+    if (s_turn.nmsgs == MAX_MSGS) {
+        return;
+    }
+    ESP_LOGI(TAG, "no reply after %d s: telling the user, and waiting in the background", (int)(DETACH_US / 1000000));
+    char notice[128];
+    strlcpy(notice, muse_lang_message("Muse is working on it. I'll tell you when it's done."), sizeof(notice));
+    int i = s_turn.nmsgs++;
+    s_turn.msgs[i] = msg_t{};
+    strlcpy(s_turn.msgs[i].id, "local-notice", sizeof(s_turn.msgs[i].id));
+    s_turn.detached = true;
+    s_turn.last_event_us = s_turn.last_content_us = now_us();
+    add_reply_text(i, notice);
+    message_done(i, nullptr);
+}
+
+/* Remembers the request that just ended its turn, to announce its reply. */
+static void pending_arm(void)
+{
+    memcpy(s_pending.ids, s_turn.user_ids, sizeof(s_pending.ids));
+    s_pending.active = s_pending.ids[0][0] || s_pending.ids[1][0];
+    s_pending.since_us = now_us();
+}
+
 /* Ends the turn once the reply is complete and spoken, or on timeouts. */
 static void check_turn(void)
 {
@@ -2199,6 +2294,10 @@ static void check_turn(void)
         return;
     }
     if (!s_turn.nmsgs) {
+        if (!text && s_turn.acked && !s_turn.incoming && t - s_turn.chat_us > DETACH_US) {
+            turn_detach();
+            return;
+        }
         /* Wait as long as the agent says it's working; the turn cap still applies. */
         if (t - s_turn.chat_us > (text ? TEXT_REPLY_TIMEOUT_US : REPLY_TIMEOUT_US) && !s_turn.agent_busy) {
             turn_fail("NO REPLY FROM MUSE");
@@ -2213,12 +2312,17 @@ static void check_turn(void)
     if (t - s_turn.last_event_us < SETTLE_US) {
         return;
     }
-    if (s_turn.agent_busy && t - s_turn.last_content_us < (text ? TEXT_BUSY_HOLD_US : BUSY_HOLD_US)) {
+    if (s_turn.agent_busy && !s_turn.detached && t - s_turn.last_content_us < (text ? TEXT_BUSY_HOLD_US : BUSY_HOLD_US)) {
         return;
     }
     ESP_LOGI(TAG, "turn done: %d message(s) in %.1fs", s_turn.nmsgs, (t - s_turn.start_us) / 1e6);
     log_marks();
+    /* Still working (or told so): its next message comes in the background. */
+    bool more = !text && (s_turn.detached || s_turn.agent_busy);
     turn_done(true);
+    if (more) {
+        pending_arm();
+    }
 }
 
 /* ---- Inbound dispatch ---- */
@@ -2530,9 +2634,12 @@ static void hatch_task(void *arg)
         check_turn();
 
         int64_t t = now_us();
+        if (s_pending.active && t - s_pending.since_us > PENDING_US) {
+            s_pending.active = false;   /* nobody's waiting for it any more */
+        }
         if (t - s_conn.last_rx_us > DEAD_US) {
             drop_connection("server went quiet");
-        } else if (s_turn.phase == P_IDLE && t - s_conn.last_use_us > IDLE_CLOSE_US) {
+        } else if (s_turn.phase == P_IDLE && !s_pending.active && t - s_conn.last_use_us > IDLE_CLOSE_US) {
             disconnect("idle");
             muse_hatch_report(MUSE_HATCH_UNTESTED, "");
             s_auto_next_us = INT64_MAX;   /* the next turn connects */
@@ -2674,6 +2781,11 @@ extern "C" void muse_hatch_text_turn(char *text)
 extern "C" void muse_hatch_text_cancel(void)
 {
     post(CMD_TEXT_CANCEL, 0);
+}
+
+extern "C" bool muse_hatch_incoming(void)
+{
+    return s_incoming.exchange(false);
 }
 
 extern "C" muse_hatch_ev_t muse_hatch_turn_event(char *text, size_t cap)

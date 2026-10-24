@@ -31,6 +31,14 @@ build-muse-p4r-lcd43 menuconfig`, under "ESP32 Device SDK"). The key ships insid
 The overlay builds for P4 silicon **v1.x** (`CONFIG_ESP32P4_SELECTS_REV_LESS_V3`, 360 MHz). A v3 image does
 not boot on it.
 
+## Slow answers
+
+When Muse is still working 20 s after it took a request (a long answer, a document), the board says so
+("Muse is working on it. I'll tell you when it's done.") and lets go, so you can ask something else. When the
+answer comes, the screen lights up and the board shows and says it. Only a reply to that request is announced,
+one request at a time, for up to 30 minutes, and only while the board stays connected. A reply that arrives
+while you are in the middle of another turn is not announced; it is in the Muse app.
+
 ## C6 coprocessor
 
 The host is pinned to ESP-Hosted 2.12.12, so the C6 must run the 2.12.12 `network_adapter` slave. Flashing
