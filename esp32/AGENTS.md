@@ -460,6 +460,15 @@ To skip BLE Wi-Fi provisioning while you iterate, set
 `CONFIG_HOMEHUB_WIFI_SSID` and `CONFIG_HOMEHUB_WIFI_PASSWORD` in `menuconfig`.
 The device still needs to be paired once for its token.
 
+## Conversation
+
+With `CONFIG_MUSE_CONVERSATION` (off by default), a tap (a press under half a second) starts a conversation instead
+of showing "hold longer to talk": the mic stays armed, a turn starts when you speak and ends after a second of
+quiet, and once Muse has said its reply the mic listens again. Eight seconds without speech, or another tap, ends
+it; a tap while Muse is talking cuts it off and ends it too. A longer press is push-to-talk as before. Speech is
+found by its level against the room's noise (taken right after arming), so a noisy room can hold a turn open
+until the 15 s limit. Muse's own sound isn't listened to: the mic waits 0.7 s after a reply.
+
 ## Slow replies
 
 On a board with the full UI and Muse's own voice session (PSRAM), a push-to-talk turn whose request Muse took
