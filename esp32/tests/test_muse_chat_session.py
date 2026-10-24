@@ -138,10 +138,10 @@ static void late_reply() {
     s_pending.active = true;
     s_turn.phase = P_IDLE;
     s_incoming = false;
-    event("delta.message_start", "stranger", "elsewhere");   /* someone else's reply */
-    event("message.assistant", "loose", "", "Parentless");
+    event("delta.message_start", "stranger", "elsewhere");   /* a reply to something else */
+    event("delta.text_append", "late", "note", "Not a start");
     assert(s_turn.phase == P_IDLE && !s_incoming);
-    event("delta.message_start", "late", "note");
+    event("delta.message_start", "late");   /* Muse's first event names no parent */
     assert(s_turn.phase == P_WAIT_REPLY && s_incoming.exchange(false) && s_turn.incoming && s_turn.acked);
     event("delta.text_append", "late", "", "The document is ready");
     event("delta.message_done", "late");
@@ -149,7 +149,7 @@ static void late_reply() {
     /* Nobody waits for it any more. */
     s_turn.phase = P_IDLE;
     s_pending.active = false;
-    event("delta.message_start", "later", "note");
+    event("delta.message_start", "later");
     assert(s_turn.phase == P_IDLE && !s_incoming);
 }
 int main(int argc, char **argv) {

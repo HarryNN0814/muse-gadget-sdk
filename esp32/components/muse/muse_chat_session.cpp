@@ -1655,20 +1655,21 @@ static bool pending_owns(const char *id)
  */
 static bool incoming_begin(const char *event, cJSON *payload)
 {
-    bool start = !strcmp(event, "delta.message_start") || !strcmp(event, "message.assistant");
-    if (!start && strcmp(event, "delta.text_append") && strcmp(event, "delta.message_done")) {
+    if (strcmp(event, "delta.message_start") && strcmp(event, "message.assistant")) {
         return false;
     }
+    /* A message's first event may name no parent (Muse's don't): like a turn's, it is taken unless it names another. */
     const char *parent = parent_id(payload);
-    if (!pending_owns(parent)) {
-        if (start) {
-            ESP_LOGI(TAG, "pending reply: %s is not for it (parent %s)", event, parent ? parent : "none");
-        }
+    if (parent && parent[0] && !pending_owns(parent)) {
+        ESP_LOGI(TAG, "pending reply: %s is for %s, not for it", event, parent);
         return false;
     }
     if (!turn_start(++s_gen, false)) {
         return false;
     }
+    char *raw = cJSON_PrintUnformatted(payload);
+    ESP_LOGI(TAG, "pending reply: %s %.160s", event, raw ? raw : "");
+    cJSON_free(raw);
     memcpy(s_turn.user_ids, s_pending.ids, sizeof(s_turn.user_ids));
     s_turn.phase = P_WAIT_REPLY;
     s_turn.chat_posted = s_turn.acked = s_turn.incoming = true;
