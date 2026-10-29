@@ -226,17 +226,17 @@ menu "Muse"
             Leave disabled to build without camera support.
 
     config MUSE_CJK_FONT
-        bool "Show Chinese and Japanese in captions"
+        bool "Show Chinese, Japanese and Korean in captions"
         depends on MUSE_ENABLED
         default n
         help
             Captions fall back to GNU Unifont's 16x16 bitmaps for CJK
-            punctuation, kana, the CJK Unified Ideographs and fullwidth
-            forms that the ASCII caption font lacks. Small screens, whose
-            captions are two lines of 8 px text, show a reply with CJK in it
-            one 16 px line at a time. Takes about 850 KB of flash and no RAM.
-            Without it those characters show as boxes. Hangul isn't
-            included.
+            punctuation, kana, the CJK Unified Ideographs, fullwidth forms,
+            Hangul jamo and Hangul syllables that the ASCII caption font
+            lacks. Small screens, whose captions are two lines of 8 px
+            text, show a reply with CJK in it one 16 px line at a time.
+            Takes about 1.2 MB of flash and no RAM. Without it those
+            characters show as boxes.
 
     config MUSE_CJK_FONT_NOTO
         bool "Draw CJK captions with Noto Sans SC instead of Unifont"
@@ -245,8 +245,9 @@ menu "Muse"
         help
             Anti-aliased Noto Sans SC Medium at 16 px in place of Unifont's
             1-bit bitmaps, in the same 16 px cell. Covers the 6763 hanzi of
-            GB2312 rather than every CJK Unified Ideograph: rarer characters
-            show as boxes. Takes about 910 KB of flash, against 850 KB.
+            GB2312 rather than every CJK Unified Ideograph, and no Hangul:
+            rarer characters and Korean show as boxes. Takes about 910 KB of
+            flash, against about 1.2 MB.
 
     config MUSE_JC3248W535_MIC_GPIO
         int "JC3248W535: GPIO for an external I2S mic's data (SD) line"

@@ -157,8 +157,8 @@ no power. Progress is a bar along the bottom edge, as on Muse's square panels.
 The AI button starts a voice note and confirms pairing; touch swipes to
 Settings and confirms pairing too. Up/Down only wake the screen. There is no
 speaker: replies are text on screen. Text uses the LVGL UI's fonts, drawn from
-their TTFs, and Muse's Chinese/Japanese CJK caption font. The
-microSD slot is off by default (`CONFIG_MUSE_STICKY_SD`):
+their TTFs, and Muse's CJK caption font for Chinese, Japanese and Korean.
+The microSD slot is off by default (`CONFIG_MUSE_STICKY_SD`):
 turned on, an inserted card is mounted at `/sdcard` without formatting, though
 nothing reads it yet. The SHT40 on
 I2C1 answers `sensors.read` with an uncalibrated 0 °C temperature offset.
@@ -551,7 +551,8 @@ and the hardware verification checklist.
 
 Experimental port of FoloToy's ESP32-C3 wearable, tested with ESP-IDF 6.0.1.
 Supports the display, buttons, BLE/Wi-Fi pairing, voice notes, text replies
-(with `CONFIG_MUSE_CJK_FONT` for Chinese and Japanese) and the battery gauge.
+(with `CONFIG_MUSE_CJK_FONT` for Chinese, Japanese and Korean) and the
+battery gauge.
 
 - The three buttons on the right edge share one ADC ladder on GPIO0. Hold
   **OK** (the bottom one) to talk; it also confirms pairing. **DOWN** opens
