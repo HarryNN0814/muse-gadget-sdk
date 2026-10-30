@@ -283,8 +283,9 @@ menu "Muse"
             The state label ("READY") and the captions the firmware shows
             itself ("CAN'T REACH MUSE"). Muse's replies are in whatever
             language you speak to it, and the serial console stays in
-            English for the tools that read it. Menus and settings aren't
-            translated yet.
+            English for the tools that read it. The button menu and the
+            pairing card are translated; the touch boards' settings pages
+            aren't yet.
 
         config MUSE_UI_LANG_EN
             bool "English"

@@ -584,6 +584,7 @@ static void set_caption_font(const char *caption)
         lv_obj_set_style_text_line_space(s_caption_lbl, space, 0);
         lv_obj_set_style_pad_hor(s_caption_lbl, CJK_BAND_PAD, 0);
         lv_obj_set_height(s_caption_lbl, lines * line_h + (lines - 1) * space + 6);
+        lv_label_set_long_mode(s_caption_lbl, LV_LABEL_LONG_MODE_DOTS);
         return;
     }
 #endif
@@ -597,6 +598,10 @@ static void set_caption_font(const char *caption)
     lv_obj_set_style_text_line_space(s_caption_lbl, 2, 0);
     lv_obj_set_style_pad_hor(s_caption_lbl, 0, 0);
     lv_obj_set_height(s_caption_lbl, 2 * 8 + 2 + 4);
+    /* Replies are paged to fit; the firmware's own captions are whole, so an
+     * accented one longer than the line rolls by rather than ending in dots. */
+    lv_label_set_long_mode(s_caption_lbl, font == &lv_font_unscii_8 ? LV_LABEL_LONG_MODE_DOTS
+                                                                    : LV_LABEL_LONG_MODE_SCROLL_CIRCULAR);
 }
 #endif
 
@@ -1032,7 +1037,10 @@ static void build_screen(void)
      * Muse app. update_chrome() fills it in, shortens it to the hex tail on a
      * screen too narrow for the whole thing, and empties it once paired. */
     s_name_lbl = make_label(face, s_small ? &lv_font_unscii_8 : &lv_font_unscii_16, COLOR_DIM);
-    lv_obj_align(s_name_lbl, LV_ALIGN_TOP_MID, 0, muse_board->rim_controls ? 88 : s_small ? 32 : 60 + s_dy);
+    /* Under the state, which a small screen draws in unscii-8 or, with accented
+     * letters, the caption font's 16 px (update_status). */
+    int state_h = lv_font_get_line_height(muse_lang_label_font(muse_lang_status("READY"), &lv_font_unscii_8));
+    lv_obj_align(s_name_lbl, LV_ALIGN_TOP_MID, 0, muse_board->rim_controls ? 88 : s_small ? 24 + state_h : 60 + s_dy);
     if (muse_board->rim_controls) {
         /* Safe chord below the round panel's top, not the full 466 px width. */
         lv_obj_set_size(s_state_lbl, 280, lv_font_get_line_height(&lv_font_unscii_16));

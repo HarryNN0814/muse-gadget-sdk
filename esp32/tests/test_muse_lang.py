@@ -26,7 +26,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 MUSE = ROOT / "components" / "muse"
 ENTRY = re.compile(r'\{ "((?:[^"\\]|\\.)*)",\s*"((?:[^"\\]|\\.)*)" \}')
-CONVERSION = re.compile(r"%[-+ #0]*\d*(?:\.\d+)?[diouxXcsfeEgGp%]")
+CONVERSION = re.compile(r"%[-+ #0]*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|j|z|t|L)?[diouxXcsfeEgGpn%]")
+# The VN board's caption band: one line of Unifont's 8 px wide letters across
+# its 284 px, which a caption of the firmware's own must fit to be read whole
+# where it doesn't roll by (muse_ui.c).
+VN_BAND_COLUMNS = 284 // 8
+GADGET_NAME = "MuseGadget-A1B2C3"
 
 
 def tables() -> dict[str, list[tuple[str, str]]]:
@@ -63,6 +68,16 @@ class LangTest(unittest.TestCase):
         for name, entries in self.tables.items():
             for en, text in entries:
                 self.assertEqual(CONVERSION.findall(text), CONVERSION.findall(en), f"{name}: {en!r}")
+
+    def test_conversions_are_seen(self) -> None:
+        # A translation can't hide a conversion from the check above.
+        self.assertEqual(CONVERSION.findall("%n %ld %zu %*d %.*s %lld"), ["%n", "%ld", "%zu", "%*d", "%.*s", "%lld"])
+
+    def test_captions_fit_the_vn_band(self) -> None:
+        values = {"%s": GADGET_NAME, "%d": "100", "%.1f": "12.3", "%%": "%"}
+        for en, text in self.tables["MESSAGES"]:
+            shown = CONVERSION.sub(lambda m: values[m.group(0)], text)
+            self.assertLessEqual(len(shown), VN_BAND_COLUMNS, f"{en!r}: {shown!r}")
 
     def test_status_names_stay_upper_case(self) -> None:
         for en, text in self.tables["STATUS"]:

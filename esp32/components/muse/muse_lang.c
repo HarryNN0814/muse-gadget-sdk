@@ -94,7 +94,7 @@ static const muse_lang_entry_t MESSAGES[] = {
     { "CANCELLED", "Đã huỷ" },
     { "SETTINGS CHANGED", "Đã đổi cài đặt" },
     { "REPLY TOO LONG", "Câu trả lời quá dài" },
-    { "REPLY TOO LONG: SEE MUSE APP", "Câu trả lời quá dài: xem trong app Muse" },
+    { "REPLY TOO LONG: SEE MUSE APP", "Trả lời quá dài: xem app Muse" },
     { "REPLY BUFFER LIMIT - TRY AGAIN", "Bộ nhớ đệm đầy, thử lại nhé" },
     { "MUSE REPLY ACCESS DENIED (403)", "Muse từ chối truy cập (403)" },
     { "MUSE REPLY AUTH REQUIRED (401)", "Muse cần đăng nhập lại (401)" },
@@ -110,7 +110,7 @@ static const muse_lang_entry_t MESSAGES[] = {
     { "GOODBYE!", "Tạm biệt!" },
     { "COULDN'T POWER OFF", "Không tắt được máy" },
     { "PHONE SETUP ON", "Đã bật cài đặt qua điện thoại" },
-    { "PHONE SETUP: %s", "Cài đặt qua điện thoại: %s" },
+    { "PHONE SETUP: %s", "Cài qua ĐT: %s" },
     { "PHONE SETUP OFF", "Đã tắt cài đặt qua điện thoại" },
     { "RESETTING...", "Đang đặt lại..." },
 };
