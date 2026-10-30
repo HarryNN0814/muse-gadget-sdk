@@ -182,7 +182,12 @@ static void set_text(lv_obj_t *l, const char *text)
     text = muse_lang_menu(text);
     if (strcmp(lv_label_get_text(l), text) != 0) {
         if (l == s_title || l == s_page) {
-            lv_obj_set_style_text_font(l, muse_lang_label_font(text, s_fine), 0);
+            const lv_font_t *font = muse_lang_label_font(text, s_fine);
+            lv_obj_set_style_text_font(l, font, 0);
+            if (l == s_title) {
+                /* unscii's spaced capitals; the caption font's wider letters close up to fit */
+                lv_obj_set_style_text_letter_space(l, font == s_fine ? 1 : 0, 0);
+            }
         }
         lv_label_set_text(l, text);
     }
@@ -360,7 +365,7 @@ static void battery_text(char *buf, size_t n)
 
 static void refresh(void)
 {
-    char buf[160];
+    char buf[256];   /* a page whose labels and names are UTF-8 (status_text) */
     if (s_view == VIEW_LIST) {
         for (int i = 0; i < ITEM_COUNT; i++) {
             value_text(i, buf, sizeof(buf));
@@ -628,7 +633,7 @@ void muse_menu_build(lv_obj_t *parent, int w, int h)
     lv_obj_add_flag(s_root, LV_OBJ_FLAG_HIDDEN);
 
     s_title = label(s_root, fine, COLOR_DIM, "MENU");
-    lv_obj_set_style_text_letter_space(s_title, 1, 0);
+    lv_obj_set_style_text_letter_space(s_title, lv_obj_get_style_text_font(s_title, 0) == fine ? 1 : 0, 0);
     lv_obj_align(s_title, LV_ALIGN_TOP_MID, 0, small ? 3 : 12);
 
     s_list = lv_obj_create(s_root);

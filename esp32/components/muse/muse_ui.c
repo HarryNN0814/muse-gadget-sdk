@@ -932,6 +932,9 @@ static void on_ring_draw(lv_event_t *e)
 
 static void build_screen(void)
 {
+#if CONFIG_MUSE_LATIN_FONT
+    muse_text_keep_latin();   /* as muse_app_run() has: the fonts picked below depend on it */
+#endif
     lv_obj_t *scr = lv_screen_active();
     lv_obj_set_style_bg_color(scr, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
@@ -1054,9 +1057,6 @@ static void build_screen(void)
      * these rows, so there's nowhere to put this without covering the face. */
     lv_obj_set_flag(s_name_lbl, LV_OBJ_FLAG_HIDDEN, s_small && !s_tall && s_h < 200);
 
-#if CONFIG_MUSE_LATIN_FONT
-    muse_text_keep_latin();
-#endif
     s_caption_lbl = make_label(face, font_pick(caption_font(), &lv_font_unscii_8), COLOR_CAPTION);
     if (s_small) {
         /* Two lines over the bottom of the face, on a dark band so they stay

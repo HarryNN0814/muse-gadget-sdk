@@ -134,8 +134,9 @@ static int read_page(view_t view)
 {
     show(view);
     assert(s_view == view);
-    lv_area_t box = coords(s_page_box);
-    assert(box.y1 >= coords(s_title).y2 && box.y2 < rule_top);
+    lv_area_t box = coords(s_page_box), title = coords(s_title);
+    assert(box.y1 >= title.y2 && box.y2 < rule_top);
+    assert(title.x1 >= 0 && title.x2 < test_board.width);   /* the whole title shows */
     int line = lv_font_get_line_height(lv_obj_get_style_text_font(s_page, 0)) +
                lv_obj_get_style_text_line_space(s_page, 0);
     int window = lv_obj_get_content_height(s_page_box);
