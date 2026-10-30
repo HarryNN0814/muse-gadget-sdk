@@ -19,9 +19,11 @@
 #include <stddef.h>
 #include <string.h>
 
-#include "lvgl.h"
 #include "muse_text.h"
 #include "sdkconfig.h"
+#if !CONFIG_MUSE_UI_FREEINK
+#include "lvgl.h"
+#endif
 
 /*
  * A translation is looked up by its English text, so a caption the code
@@ -276,12 +278,15 @@ const char *muse_lang_menu(const char *en)
     return en;
 }
 
+#if !CONFIG_MUSE_UI_FREEINK
 const lv_font_t *muse_lang_montserrat(const lv_font_t *font)
 {
     return font;
 }
 #endif
+#endif
 
+#if !CONFIG_MUSE_UI_FREEINK
 #if CONFIG_MUSE_LATIN_FONT
 LV_FONT_DECLARE(muse_font_latin_16)
 #endif
@@ -296,3 +301,4 @@ const lv_font_t *muse_lang_label_font(const char *text, const lv_font_t *plain)
     (void)text;
     return plain;
 }
+#endif

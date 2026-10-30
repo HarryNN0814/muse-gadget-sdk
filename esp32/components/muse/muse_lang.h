@@ -16,7 +16,10 @@
 
 #pragma once
 
+#include "sdkconfig.h"
+#if !CONFIG_MUSE_UI_FREEINK
 #include "lvgl.h"
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -39,6 +42,7 @@ const char *muse_lang_message(const char *en);
 /* The button menu and the pairing card ("Volume", "Pairing code"). */
 const char *muse_lang_menu(const char *en);
 
+#if !CONFIG_MUSE_UI_FREEINK   /* the LVGL UI's fonts; e-paper draws English only */
 /* A Montserrat font LVGL builds in, with the language's letters to fall back
  * on, or `font` itself. */
 const lv_font_t *muse_lang_montserrat(const lv_font_t *font);
@@ -46,6 +50,7 @@ const lv_font_t *muse_lang_montserrat(const lv_font_t *font);
 /* A label's font for its text: `plain` (unscii), or the caption font if the
  * text has accented letters (CONFIG_MUSE_LATIN_FONT). */
 const lv_font_t *muse_lang_label_font(const char *text, const lv_font_t *plain);
+#endif
 
 #ifdef __cplusplus
 }
