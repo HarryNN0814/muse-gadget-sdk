@@ -220,7 +220,10 @@ static lv_display_t *display_start(lv_indev_t **touch)
     esp_lcd_panel_reset(s_panel);
     esp_lcd_panel_init(s_panel);
     for (size_t i = 0; i < sizeof(s_lcd_init) / sizeof(s_lcd_init[0]); i++) {
-        esp_lcd_panel_io_tx_param(s_io, s_lcd_init[i].cmd, s_lcd_init[i].data, s_lcd_init[i].len);
+        if (esp_lcd_panel_io_tx_param(s_io, s_lcd_init[i].cmd, s_lcd_init[i].data, s_lcd_init[i].len) != ESP_OK) {
+            ESP_LOGE(TAG, "LCD init command 0x%02x failed", s_lcd_init[i].cmd);
+            return NULL;
+        }
         if (s_lcd_init[i].delay_ms) {
             vTaskDelay(pdMS_TO_TICKS(s_lcd_init[i].delay_ms));
         }
