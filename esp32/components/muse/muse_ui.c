@@ -529,14 +529,16 @@ LV_FONT_DECLARE(muse_font_latin_16)
 static const lv_font_t *caption_font(void)
 {
 #if CONFIG_MUSE_CJK_FONT
-    static lv_font_t font, cjk;
+    static lv_font_t font;
     if (!font.get_glyph_dsc) {
-        cjk = CJK_FONT;
-#if CONFIG_MUSE_LATIN_FONT
-        cjk.fallback = &muse_font_latin_16;   /* accented letters among CJK */
-#endif
         font = lv_font_unscii_16;
+        font.fallback = &CJK_FONT;
+#if CONFIG_MUSE_LATIN_FONT
+        static lv_font_t cjk;   /* and a copy of that for accented letters among CJK */
+        cjk = CJK_FONT;
+        cjk.fallback = &muse_font_latin_16;
         font.fallback = &cjk;
+#endif
     }
     return &font;
 #else
