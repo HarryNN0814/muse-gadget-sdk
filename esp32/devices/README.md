@@ -69,6 +69,7 @@ session to Muse. The rest depends on the hardware.
 | **M5Stack Core2 (v1.0)** | ESP32 | 2.0" 320×240 touch LCD | 16 MB / 8 MB | [M5Stack docs](https://docs.m5stack.com/en/core/Core2), [M5Unified](https://github.com/m5stack/M5Unified) | — |
 | **Freenove FNK0104B** | ESP32-S3 | 2.8" 240×320 LCD, touch | 16 MB / 8 MB | [Freenove repo](https://github.com/Freenove/Freenove_ESP32_S3_Display) | — |
 | **VN ESP32-S3 1.83-inch NV3023** | ESP32-S3 | 1.83" 284×240 LCD (NV3023) | 16 MB / 8 MB | [xiaozhi-esp32_vietnam board](https://github.com/TienHuyIoT/xiaozhi-esp32_vietnam) | — |
+| **Deotaland RoRoLee** | ESP32-S3 | 240×120 AMOLED (SH8501) | 16 MB / 8 MB | [rorolee.com](https://rorolee.com/) | [Rorolee](https://rorolee.com/products/rorolee-the-first-pocket-ai-agent) |
 
 The experimental [OSTB EchoEar-2ST port](ostb-echoear-2st.md) targets the
 measured 16 MB flash / 8 MB PSRAM unit. Its hardware and validation limits
@@ -76,20 +77,20 @@ are documented separately; this is not a generic ESP-VoCat profile.
 
 ## Features
 
-|  | DevKitC-1 | C6 devkit | ideaspark | Waveshare C6 LCD 1.47 | SenseCAP Indicator | Waveshare S3 ePaper 1.54 | Waveshare S3 ePaper 1.54G | reTerminal E1001 | reTerminal E1002 | reTerminal Sticky* | HA Voice PE | reSpeaker Lite (experimental) | Waveshare S3 1.75C | Waveshare S3 1.75 | Waveshare S3 1.85C | Waveshare S3 2.16 | Waveshare S3 2.06 | AIPI Lite | Waveshare C6 1.8 | Waveshare C6 2.06 | Watcher | StickS3 | StickC Plus2 | Cardputer ADV | BOX-3 | StopWatch | XIAO S3 1.47 | CoreS3 | Core2 | FNK0104B | S3 DevKitC-1 | JC3248W535 | VN S3 1.83-inch | Waveshare LCD7 | Waveshare LCD 1.28 | AI Passport | EchoEar-2ST* | ATK BOX | Waveshare P4 3.5 |
-| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
-| Home-network tunnel | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | Enabled (unverified) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Enabled (unverified) | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | Enabled | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | Enabled | ✅ | Enabled |
-| Shows status on | Light | Light | Screen | Screen | Screen | E-paper | E-paper | E-paper | E-paper | E-paper | Light ring | RGB LED | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Light | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar |
-| Images from Muse | — | — | ✅ | ✅ | ✅ | Black and white | Four colours | Black and white | Six colours | Four grays (checked on one unit) | — | — | ✅ | ✅ | ✅ | ✅ | Enabled (unverified) | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | Enabled | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | Enabled | Unverified | — |
-| UI and settings | — | — | — | — | — | — | — | — | — | Basic navigation checked | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Experimental | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | Experimental | Experimental | ✅ | ✅ |
-| Push-to-talk | — | — | — | — | — | — | — | — | — | AI voice note checked; screen mic unverified | ✅ | XIAO BOOT | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Text replies | Text replies | ✅ | ✅ | ✅ | Text replies (experimental) | ✅ | ✅ | USR1 | ✅ | ✅ | ✅ | — | With an added I2S mic | ✅ | — | — | Text replies (experimental) | Screen mic | ✅ | ✅ |
-| Speaker and mic | — | — | — | — | — | — | — | — | — | PDM voice note checked, no speaker | ✅ | 16 kHz I2S | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Buzzer and mic | ES8311 (experimental) | ✅ | ✅ | PDM mic, no speaker | ✅ | ✅ | ES8311 | — | Speaker (NS4168), no mic | ES8311, ES7210 | — | — | ES8311 (experimental) | ES8311 / ES7210 | ES8311, one mic | ES8311 |
-| Air sensors | — | — | — | — | D1S, D1Pro | — | — | Temperature, humidity | Temperature, humidity | Temperature, humidity | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| Video from a phone (`MUSE_VIDEO=1`) | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | Built, not run | — | — | — | — | — | — | — | — | — | — | — | Built, not run | — | — | — | — | — | — | — | — | — | — | — | — | — |
-| Touch | — | — | — | — | — | — | — | — | — | GT911 (checked on one unit) | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — | ✅ |
-| Battery status | — | — | — | — | — | — | — | — | — | BQ27220 %/mV and charging checked | — | — | ✅ | ✅ | ✅ | ✅ | Unverified | ✅ | ✅ | ✅ | ✅ | ✅ | Voltage only | — | — | ✅ | — | ✅ | ✅ | Voltage only | — | — | Percent only | — | Voltage only (unverified) | No charging state | Unverified | — | ✅ |
-| Over-the-air updates | Off | Off | Off | Off | Off | Off | Off | Off | Off | On (checked on one unit) | Off | Off | On | On | On | On | On | On | On | On | On | On | On | Off | On | On | Off | On | On | On | Off | On | On | On | On | Off | On | On | On |
-| Buttons | BOOT | BOOT | BOOT | BOOT | Top | BOOT | BOOT | Green | Green | AI (talk/setup); Up/Down wake | Centre (talk), dial | XIAO BOOT (talk/setup) | PWR (talk), BOOT | BOOT (talk), PWR | Hold face (talk), BOOT | BOOT, PWR (talk), KEY (talk) on top | BOOT (talk), PWR | Two | BOOT (talk), PWR | BOOT (talk), PWR | Wheel (press to talk, turn to sleep) | Front (talk), side (menu), PWR | Front (talk), side (menu), PWR | GO/Space (talk), Esc/Enter/arrows (menu) | BOOT/CONFIG (talk) | Blue top-right (talk), yellow top-left (speaker), red bottom-left (power) | USR1 (talk/setup), USR2 (screen) | PWR (talk), RST | Touch BtnB (talk), PWR | BOOT (talk) | BOOT | BOOT (talk) | BOOT (talk), Vol+/Vol- (menu) | BOOT (flash only) | Screen only | OK (talk), UP/DOWN (menu) | Touch; bottom power button | K0 (talk), K1 (menu) | BOOT (talk), PWR |
+|  | DevKitC-1 | C6 devkit | ideaspark | Waveshare C6 LCD 1.47 | SenseCAP Indicator | Waveshare S3 ePaper 1.54 | Waveshare S3 ePaper 1.54G | reTerminal E1001 | reTerminal E1002 | reTerminal Sticky* | HA Voice PE | reSpeaker Lite (experimental) | Waveshare S3 1.75C | Waveshare S3 1.75 | Waveshare S3 1.85C | Waveshare S3 2.16 | Waveshare S3 2.06 | AIPI Lite | Waveshare C6 1.8 | Waveshare C6 2.06 | Watcher | StickS3 | StickC Plus2 | Cardputer ADV | BOX-3 | StopWatch | XIAO S3 1.47 | CoreS3 | Core2 | FNK0104B | S3 DevKitC-1 | JC3248W535 | VN S3 1.83-inch | Waveshare LCD7 | Waveshare LCD 1.28 | AI Passport | EchoEar-2ST* | ATK BOX | Waveshare P4 3.5 | RoRoLee |
+| --- | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: | :-: |
+| Home-network tunnel | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | Enabled (unverified) | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Enabled (unverified) | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | Enabled | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | Enabled | ✅ | Enabled | ✅ |
+| Shows status on | Light | Light | Screen | Screen | Screen | E-paper | E-paper | E-paper | E-paper | E-paper | Light ring | RGB LED | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Light | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar | Avatar |
+| Images from Muse | — | — | ✅ | ✅ | ✅ | Black and white | Four colours | Black and white | Six colours | Four grays (checked on one unit) | — | — | ✅ | ✅ | ✅ | ✅ | Enabled (unverified) | ✅ | — | — | ✅ | ✅ | ✅ | — | ✅ | ✅ | Enabled | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | — | Enabled | Unverified | — | ✅ |
+| UI and settings | — | — | — | — | — | — | — | — | — | Basic navigation checked | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Experimental | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | ✅ | Experimental | Experimental | ✅ | ✅ | ✅ |
+| Push-to-talk | — | — | — | — | — | — | — | — | — | AI voice note checked; screen mic unverified | ✅ | XIAO BOOT | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Text replies | Text replies | ✅ | ✅ | ✅ | Text replies (experimental) | ✅ | ✅ | USR1 | ✅ | ✅ | ✅ | — | With an added I2S mic | ✅ | — | — | Text replies (experimental) | Screen mic | ✅ | ✅ | ✅ |
+| Speaker and mic | — | — | — | — | — | — | — | — | — | PDM voice note checked, no speaker | ✅ | 16 kHz I2S | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | Buzzer and mic | ES8311 (experimental) | ✅ | ✅ | PDM mic, no speaker | ✅ | ✅ | ES8311 | — | Speaker (NS4168), no mic | ES8311, ES7210 | — | — | ES8311 (experimental) | ES8311 / ES7210 | ES8311, one mic | ES8311 | ES8311, ES7210 |
+| Air sensors | — | — | — | — | D1S, D1Pro | — | — | Temperature, humidity | Temperature, humidity | Temperature, humidity | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| Video from a phone (`MUSE_VIDEO=1`) | — | — | — | — | — | — | — | — | — | — | — | — | ✅ | Built, not run | — | — | — | — | — | — | — | — | — | — | — | Built, not run | — | — | — | — | — | — | — | — | — | — | — | — | — | — |
+| Touch | — | — | — | — | — | — | — | — | — | GT911 (checked on one unit) | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | ✅ | ✅ | — | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | — | ✅ | — | ✅ | ✅ | — | ✅ | — | ✅ | — |
+| Battery status | — | — | — | — | — | — | — | — | — | BQ27220 %/mV and charging checked | — | — | ✅ | ✅ | ✅ | ✅ | Unverified | ✅ | ✅ | ✅ | ✅ | ✅ | Voltage only | — | — | ✅ | — | ✅ | ✅ | Voltage only | — | — | Percent only | — | Voltage only (unverified) | No charging state | Unverified | — | ✅ | ✅ |
+| Over-the-air updates | Off | Off | Off | Off | Off | Off | Off | Off | Off | On (checked on one unit) | Off | Off | On | On | On | On | On | On | On | On | On | On | On | Off | On | On | Off | On | On | On | Off | On | On | On | On | Off | On | On | On | On |
+| Buttons | BOOT | BOOT | BOOT | BOOT | Top | BOOT | BOOT | Green | Green | AI (talk/setup); Up/Down wake | Centre (talk), dial | XIAO BOOT (talk/setup) | PWR (talk), BOOT | BOOT (talk), PWR | Hold face (talk), BOOT | BOOT, PWR (talk), KEY (talk) on top | BOOT (talk), PWR | Two | BOOT (talk), PWR | BOOT (talk), PWR | Wheel (press to talk, turn to sleep) | Front (talk), side (menu), PWR | Front (talk), side (menu), PWR | GO/Space (talk), Esc/Enter/arrows (menu) | BOOT/CONFIG (talk) | Blue top-right (talk), yellow top-left (speaker), red bottom-left (power) | USR1 (talk/setup), USR2 (screen) | PWR (talk), RST | Touch BtnB (talk), PWR | BOOT (talk) | BOOT | BOOT (talk) | BOOT (talk), Vol+/Vol- (menu) | BOOT (flash only) | Screen only | OK (talk), UP/DOWN (menu) | Touch; bottom power button | K0 (talk), K1 (menu) | BOOT (talk), PWR | BOOT (talk), VOL- and VOL+ (menu) |
 
 *Sticky entries describe an experimental Muse port, not Seeed's factory
 firmware. On one unit the display, touch, voice notes/CJK replies, SHT40,
@@ -676,6 +677,7 @@ board's overlays, in order:
 | Freenove FNK0104B | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-fnk0104b`](sdkconfig.muse-fnk0104b) | `tools/muse/board.sh build fnk0104b` |
 | VN ESP32-S3 1.83-inch NV3023 | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-vn-s3-183`](sdkconfig.muse-vn-s3-183) | `tools/muse/board.sh build vn183` |
 | FoloToy AI Passport | `esp32c3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-ai-passport`](sdkconfig.muse-ai-passport) | `tools/muse/board.sh build ai-passport` |
+| Deotaland RoRoLee | `esp32s3` | [`devices/sdkconfig.muse`](sdkconfig.muse), [`devices/sdkconfig.muse-deotaland-rorolee`](sdkconfig.muse-deotaland-rorolee) | `tools/muse/board.sh build rorolee` |
 
 `tools/board.sh BOARD [build|flash|monitor|flash-monitor] [PORT]` builds each
 board in its own `build-<board>` directory. For the boards with the full UI, run `idf.py`
@@ -781,3 +783,34 @@ sleep, and BOOT wakes it.
 Coming from other firmware, erase the flash once before the first flash
 (`idf.py -p PORT erase-flash`): Muse's NVS and `prod_data` partitions sit where
 other firmware keeps its own data.
+
+## Deotaland RoRoLee
+
+The Deotaland RoRoLee (RRL-01) is an ESP32-S3 with 16 MB of flash and 8 MB of
+octal PSRAM, a 120×240 SH8501 AMOLED, an ES8311 for the speaker, an ES7210 for
+the microphone and a BQ27220 battery gauge. It's held in landscape, but the
+SH8501 can't exchange rows and columns, so the UI draws 240×120 and the board
+turns that onto a portrait copy of the screen, which goes to the panel whole
+after each refresh, as Deotaland's own firmware sends it. The panel gets its
+maker's short init sequence; power and gamma come from the panel's OTP.
+
+BOOT is push-to-talk and pairing confirmation; VOL- opens the menu and moves
+down it, VOL+ moves up it, and BOOT selects. There's no touch, so set it up
+over BLE. Replies are mostly Chinese, so the overlay turns on
+`CONFIG_MUSE_CJK_FONT`. The battery shows the gauge's charge and voltage.
+Powering off from Muse cuts the rail that feeds the screen, audio and gauge
+and puts the ESP32-S3 in deep sleep. Only BOOT wakes it: the volume buttons
+aren't on RTC pins. The vibration motor, SD card slot and 32 kHz crystal
+aren't used yet. It enumerates as the chip's own USB serial port:
+`tools/muse/board.sh flash rorolee`.
+
+It ships with Deotaland's firmware. Back up the flash, then erase it once
+before the first flash: Muse's NVS and `prod_data` partitions sit where that
+firmware keeps its own data.
+
+```sh
+python -m esptool --chip esp32s3 -p PORT read-flash 0 0x1000000 rorolee.bin
+idf.py -p PORT erase-flash
+```
+
+To go back, write the backup with `write-flash 0 rorolee.bin`.

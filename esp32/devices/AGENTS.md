@@ -223,6 +223,7 @@ The fields of `muse_board_t`:
 | `touch_talk` | Optional touch-only push-to-talk: the LVGL microphone sends press/release edges through the existing input handler, and an explicit screen press confirms pending pairing. Defaults to false; requires `touch`. |
 | `keyboard` | Dedicated navigation keys: `poll_buttons` emits `MUSE_BTN_UP/DOWN/LEFT/RIGHT/ENTER/ESCAPE` presses. Enter selects and confirms pairing; Talk is not repurposed as Select while the menu is open. Defaults to false for two-button boards. |
 | `talk_button`, `aux_button` | On-screen captions ("boot", "pwr"). `talk_hint` and `aux_hint` place them next to the physical button |
+| `wake_button` | The menu's power-off page names this button as the one that turns the board back on, when that isn't `aux_button` (and the board has no `keyboard`). May be NULL |
 | `flat_menu_hints` | With `aux_hint` on `LV_ALIGN_RIGHT_MID` the menu turns that button's hint on end, drawn through a ~14 KB layer. Set it on a board that can't spare the RAM (the ESP32-C3): the hint lies flat on the menu's bar instead |
 | `frame_ms` | Avatar frame period: 40 on the S3 boards, 50 on the C6 |
 | `avatar_px` | Optional avatar canvas size in pixels; 0 uses the layout default |
